@@ -31,6 +31,24 @@ export function mapDetail(payload, expected) {
     ...classifyEmployment(`${info.jobName || ''}\n${description}`) });
 }
 
+export function mapDomDetail(snapshot, expected) {
+  const path = `/job_detail/${expected.platformJobId}.html`;
+  for(const value of [snapshot.url,snapshot.canonical]) {
+    let url;
+    try { url=new URL(value); } catch { throw new ResearchError('DETAIL_MISSING','页面缺少可核对的岗位链接'); }
+    if(url.origin!=='https://www.zhipin.com' || url.pathname!==path) throw new ResearchError('IDENTITY_MISMATCH','页面岗位链接与目标不符');
+  }
+  const normalize = text => String(text || '').normalize('NFKC').replace(/\s/g,'');
+  if(!expected.title || !expected.company || !snapshot.title || !snapshot.company) throw new ResearchError('DETAIL_MISSING','页面缺少身份核验字段');
+  if(normalize(snapshot.title)!==normalize(expected.title) || normalize(snapshot.company)!==normalize(expected.company)) throw new ResearchError('IDENTITY_MISMATCH','页面标题或公司与列表不符，已拒绝写入');
+  const expired=/已关闭|已下线|停止招聘|已结束/.test(snapshot.statusText || '');
+  const description=typeof snapshot.description==='string'?snapshot.description.trim():'';
+  return sanitizeJob({...expected,description:expired?'':description,
+    detailStatus:expired?'expired':description?'complete':'missing',detailSource:'verified-dom',
+    recruitmentStatus:snapshot.statusText || expected.recruitmentStatus,
+    ...classifyEmployment(`${snapshot.title}\n${description}`)});
+}
+
 // Adapted from npe_get_jobs regions.js; platform city codes are NOT administrative codes.
 export function resolveRegion(provinces, name) {
   const normalize = value => value.trim().replace(/[省市区县]$/, '');

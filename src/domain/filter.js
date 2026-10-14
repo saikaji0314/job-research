@@ -16,6 +16,7 @@ export function filterJob(job, preferences) {
   const checks = [];
   const add = (field, result, evidence) => checks.push({ field, result, evidence });
   const salary = parseSalary(job.salary);
+  if(preferences.titleInclude.length) add('title',!job.title?'unknown':preferences.titleInclude.some(word=>normalized(job.title).includes(normalized(word)))?'matched':'rejected',job.title || null);
   const target = preferences.salary;
   if (target.minMonthlyK !== null || target.maxMonthlyK !== null) {
     const known = salary.minMonthlyK !== null;

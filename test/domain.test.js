@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { validateConfig, applyOverrides } from '../src/domain/config.js';
 import { filterJob, parseSalary } from '../src/domain/filter.js';
 import { sanitizeJob } from '../src/domain/job.js';
-import { mapListJob, mapDetail, resolveRegion } from '../src/platforms/boss/mapping.js';
+import { mapListJob, mapDetail, mapDomDetail, resolveRegion } from '../src/platforms/boss/mapping.js';
 import { assertBossUrl } from '../src/browser/session.js';
 import { classifyEmployment } from '../src/domain/employment.js';
 
@@ -93,4 +93,20 @@ test('employment labels require explicit evidence and respect negative statement
   assert.equal(classifyEmployment('需要长期驻场').employmentType,'onsite');
   assert.equal(classifyEmployment('无需长期驻场办公').employmentType,'unknown');
   assert.equal(classifyEmployment('不是本公司直招').employmentType,'unknown');
+});
+test('DOM fallback needs URL, canonical, title and company agreement before accepting JD',()=> {
+  const expected={...job,company:'虚构公司'};
+  const snapshot={url:'https://www.zhipin.com/job_detail/fixture-one.html',canonical:'https://www.zhipin.com/job_detail/fixture-one.html',
+    title:job.title,company:'虚构公司',description:'由本地虚构页面提供的完整正文'};
+  assert.equal(mapDomDetail(snapshot,expected).detailSource,'verified-dom');
+  assert.throws(()=>mapDomDetail({...snapshot,canonical:'https://www.zhipin.com/job_detail/other.html'},expected),e=>e.code==='IDENTITY_MISMATCH');
+  assert.throws(()=>mapDomDetail({...snapshot,company:'其他公司'},expected),e=>e.code==='IDENTITY_MISMATCH');
+  assert.throws(()=>mapDomDetail({...snapshot,canonical:null},expected),e=>e.code==='DETAIL_MISSING');
+  assert.equal(mapDomDetail({...snapshot,description:''},expected).detailStatus,'missing');
+});
+test('title filters can reject keyword-search noise without deleting originals',()=> {
+  const p=prefs({titleInclude:['工程师','开发']});
+  assert.equal(filterJob({...job,title:'示例开发工程师'},p).status,'matched');
+  assert.equal(filterJob({...job,title:'示例运营'},p).status,'rejected');
+  assert.equal(filterJob({...job,title:null},p).status,'review');
 });

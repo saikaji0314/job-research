@@ -6,7 +6,7 @@ export const defaults = {
   collection: { maxUniqueJobs: 30, maxScrollsPerKeyword: 2, detailConcurrency: 1,
     detailIntervalMs: 3000, onAuthenticationOrVerification: 'pause' },
   preferences: { salary: { minMonthlyK: null, maxMonthlyK: null, matchMode: 'overlap' },
-    experienceInclude: [], educationInclude: [], industriesInclude: [], companyScalesInclude: [],
+    titleInclude: [], experienceInclude: [], educationInclude: [], industriesInclude: [], companyScalesInclude: [],
     employment: { include: [], exclude: [], prefer: [] }, excludeKeywords: [], unknownPolicy: 'keep_for_review' },
   exports: ['jsonl', 'csv', 'summary'],
 };
@@ -26,7 +26,7 @@ export function validateConfig(input = {}, { requireSearch = false } = {}) {
   const c = merge(defaults, input);
   if (c.schemaVersion !== 1 || c.platform !== 'boss') fail('只支持 schemaVersion=1 和 platform=boss');
   if (c.regionName !== null && (typeof c.regionName !== 'string' || !c.regionName.trim())) fail('regionName 必须是非空城市名称或 null');
-  const arrays = [c.keywords, c.exports, c.preferences.experienceInclude, c.preferences.educationInclude,
+  const arrays = [c.keywords, c.exports, c.preferences.titleInclude, c.preferences.experienceInclude, c.preferences.educationInclude,
     c.preferences.industriesInclude, c.preferences.companyScalesInclude, c.preferences.excludeKeywords,
     ...Object.values(c.preferences.employment)];
   if (arrays.some(a => !Array.isArray(a) || a.some(v => typeof v !== 'string' || !v.trim()))) fail('集合配置必须是非空字符串数组');

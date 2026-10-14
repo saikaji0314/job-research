@@ -1,6 +1,6 @@
 import { assertBossUrl, requireAuthenticated } from '../../browser/session.js';
 import { ResearchError, abortIfNeeded } from '../../domain/errors.js';
-import { mapListJob, mapDetail, resolveRegion, searchUrl, decodeBossText } from './mapping.js';
+import { mapListJob, mapDetail, mapDomDetail, resolveRegion, searchUrl, decodeBossText } from './mapping.js';
 import { sanitizeJob } from '../../domain/job.js';
 
 const CARD = 'li.job-card-wrapper, ul.rec-job-list li.job-card-box, .job-list-container li.job-card-box';
@@ -128,7 +128,14 @@ export class BossAdapter {
       const candidates = responses.filter(p => (p.zpData?.jobInfo?.encryptId || p.zpData?.jobInfo?.encryptJobId) === job.platformJobId);
       if (!candidates.length) {
         if (responses.some(p => p.zpData?.jobInfo)) throw new ResearchError('IDENTITY_MISMATCH', '响应属于其他岗位，已拒绝写入');
-        throw new ResearchError('DETAIL_MISSING', '未取得可校验身份的详情响应；页面标签不会作为完整 JD');
+        const snapshot=await this.page.evaluate(()=> {
+          const scoped=document.querySelectorAll('.job-detail-section > .job-sec-text');
+          const sections=scoped.length?scoped:document.querySelectorAll('.job-sec-text');
+          return {url:location.href,canonical:document.querySelector('link[rel="canonical"]')?.getAttribute('href'),
+            title:document.querySelector('h1')?.textContent?.trim(),company:document.querySelector('.sider-company .company-info')?.textContent?.trim(),
+            description:sections.length===1?sections[0].innerText:'',statusText:document.querySelector('.job-status')?.textContent?.trim() || ''};
+        });
+        return mapDomDetail(snapshot,job);
       }
       return mapDetail(candidates.at(-1),job);
     } catch(error) {

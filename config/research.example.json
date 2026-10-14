@@ -11,6 +11,7 @@
     "onAuthenticationOrVerification": "pause"
   },
   "preferences": {
+    "titleInclude": [],
     "salary": {
       "minMonthlyK": null,
       "maxMonthlyK": null,

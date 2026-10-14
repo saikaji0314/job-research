@@ -18,6 +18,8 @@ export async function exportBatch(store, batchId, config, root) {
   const details = count(rows.map(x => x.detailStatus));
   const summary = { batchId, runId, exportedAt: new Date().toISOString(), batchStatus: batch.status,
     stopReason: batch.reason, config, configHash: hash(config), jobs: rows.length,
+    listObservations: store.db.prepare("SELECT count(*) AS n FROM snapshots WHERE batch_id=? AND kind='list'").get(batchId).n,
+    keywordAssociations: store.db.prepare('SELECT count(*) AS n FROM origins WHERE batch_id=?').get(batchId).n,
     detailAttemptedJobs: rows.filter(x => x.detailAttempts > 0).length,
     detailAttempts: rows.reduce((sum,x) => sum+x.detailAttempts,0), details, selection: statuses,
     searches: store.db.prepare('SELECT keyword,status,reason FROM searches WHERE batch_id=?').all(batchId),

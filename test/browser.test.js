@@ -21,7 +21,9 @@ test('Chrome local-fixture integration: discovery, full JD, mismatched ID, login
         else if(url.pathname.includes('/web/user/')) html='<a class="header-login-btn">登录</a>';
         else if(url.pathname.startsWith('/job_detail/')) {
           const id=url.pathname.includes('wrong')?'other-job':'fixture-browser';
-          html=auth+`<div class="job-sec-text">本地样例正文</div><script>fetch('/wapi/zpgeek/job/detail.json?id=${id}')</script>`;
+          html=auth+(url.pathname.includes('dom-fixture')
+            ? '<link rel="canonical" href="https://www.zhipin.com/job_detail/dom-fixture.html"><h1>虚构岗位</h1><div class="sider-company"><div class="company-info">虚构公司</div></div><div class="job-detail-section"><div class="job-sec-text">服务端直接渲染的虚构正文</div></div><div class="job-detail-section job-detail-company"><div class="company-info-box"><div class="job-sec-text">公司介绍不可冒充JD</div></div></div>'
+            : `<div class="job-sec-text">本地样例正文</div><script>fetch('/wapi/zpgeek/job/detail.json?id=${id}')</script>`);
         } else html=auth+'<div class="job-list-container"><li class="job-card-wrapper"><a href="/job_detail/fixture-browser.html"><span class="job-name">虚构岗位</span></a></li></div><script>fetch("/wapi/zpgeek/search/joblist.json?query=sample")</script>';
         return route.fulfill({contentType:'text/html; charset=utf-8',body:html});
       });
@@ -31,6 +33,9 @@ test('Chrome local-fixture integration: discovery, full JD, mismatched ID, login
       assert.equal(result.discovered,1);assert.equal(jobs[0].detailStatus,'pending');assert.equal(jobs[0].description,'');
       const detail=await adapter.detail(jobs[0]);assert.equal(detail.detailStatus,'complete');assert.equal(detail.employmentType,'direct');
       assert.ok(detail.description.includes('此内容完全虚构'));
+      const dom=await adapter.detail({...jobs[0],platformJobId:'dom-fixture',href:'https://www.zhipin.com/job_detail/dom-fixture.html'});
+      assert.equal(dom.detailStatus,'complete');assert.equal(dom.detailSource,'verified-dom');
+      assert.ok(!dom.description.includes('公司介绍'));
       await assert.rejects(adapter.detail({...jobs[0],platformJobId:'wrong',href:'https://www.zhipin.com/job_detail/wrong.html'}),e=>e.code==='IDENTITY_MISMATCH');
       await page.goto('https://www.zhipin.com/web/user/');assert.equal(await sessionState(page),'unauthenticated');
       await assert.rejects(adapter.authenticate(),e=>e.code==='AUTHENTICATION_REQUIRED');
