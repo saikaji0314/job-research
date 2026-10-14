@@ -9,10 +9,12 @@ import { classifyEmployment } from '../src/domain/employment.js';
 
 const config = input => validateConfig(input);
 const prefs = input => config({preferences:input}).preferences;
-const job = { platformJobId:'fixture-one', salary:'18-28K', title:'示例岗位', degree:'本科', experience:'1-3年',detailStatus:'complete' };
+const job = { platformJobId:'fixture-one', salary:'18-28K', title:'示例岗位', degree:'本科', experience:'1-3年',detailStatus:'complete',description:'虚构岗位职责',detailSource:'fixture' };
 test('unconfigured filters impose no personal defaults or salary unknown',()=> {
   const c = config(); assert.equal(c.regionName,null); assert.deepEqual(c.keywords,[]);
-  assert.equal(filterJob({},c.preferences).status,'matched');
+  assert.equal(filterJob({},c.preferences).status,'review');
+  assert.ok(!filterJob({},c.preferences).checks.some(x=>x.field==='salary'));
+  assert.equal(filterJob({},prefs({requireCompleteDetails:false})).status,'matched');
   assert.throws(()=>validateConfig({}, {requireSearch:true}), /搜索需要/);
 });
 test('config rejects typos, invalid limits, contradictions and unsupported concurrency',()=> {
@@ -27,7 +29,7 @@ test('CLI overrides preserve existing filters and validate numeric arguments',()
   assert.throws(()=>applyOverrides({}, {minSalary:'NaN'}));
 });
 test('salary parser handles K, decimal 万, private-use decoding separately and pay months',()=> {
-  assert.deepEqual(parseSalary('18-28K·13薪'),{minMonthlyK:18,maxMonthlyK:28,months:13,raw:'18-28K·13薪'});
+  assert.deepEqual(parseSalary('18-28K·13薪'),{minMonthlyK:18,maxMonthlyK:28,months:13,period:'month',raw:'18-28K·13薪'});
   assert.equal(parseSalary('1.8-2.8万/月').maxMonthlyK,28);
   assert.equal(parseSalary('18K-28K').minMonthlyK,18);
   for(const raw of ['30-50万/年','200-300元/天','面议','20K以上','28-18K','123','']) assert.equal(parseSalary(raw).minMonthlyK,null,raw);
@@ -101,7 +103,8 @@ test('DOM fallback needs URL, canonical, title and company agreement before acce
   assert.equal(mapDomDetail(snapshot,expected).detailSource,'verified-dom');
   assert.throws(()=>mapDomDetail({...snapshot,canonical:'https://www.zhipin.com/job_detail/other.html'},expected),e=>e.code==='IDENTITY_MISMATCH');
   assert.throws(()=>mapDomDetail({...snapshot,company:'其他公司'},expected),e=>e.code==='IDENTITY_MISMATCH');
-  assert.throws(()=>mapDomDetail({...snapshot,canonical:null},expected),e=>e.code==='DETAIL_MISSING');
+  assert.throws(()=>mapDomDetail({...snapshot,canonical:null},expected),e=>e.code==='DETAIL_LINK_UNAVAILABLE');
+  assert.throws(()=>mapDomDetail({...snapshot,company:null},expected),e=>e.code==='DETAIL_COMPANY_UNAVAILABLE');
   assert.equal(mapDomDetail({...snapshot,description:''},expected).detailStatus,'missing');
 });
 test('title filters can reject keyword-search noise without deleting originals',()=> {

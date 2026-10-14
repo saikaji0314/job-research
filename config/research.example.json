@@ -15,8 +15,16 @@
     "salary": {
       "minMonthlyK": null,
       "maxMonthlyK": null,
-      "matchMode": "overlap"
+      "matchMode": "overlap",
+      "periodInclude": []
     },
+    "candidate": {
+      "educationLevel": null,
+      "experienceYears": null,
+      "challengeMaxRequiredYears": null
+    },
+    "excludeInternships": false,
+    "requireCompleteDetails": true,
     "experienceInclude": [],
     "educationInclude": [],
     "industriesInclude": [],

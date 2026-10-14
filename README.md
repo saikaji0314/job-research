@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-首版 CLI 已实现：用户登录、多关键词列表采集、完整 JD 读取、身份校验、SQLite 批次与快照、中断继续、条件筛选和 JSONL／CSV 导出。25 项测试通过；首轮真实采集 30 条去重岗位，26 条取得正文，并完成 5 条页面抽查。
+0.2.0 CLI 已实现：用户登录、多关键词列表采集、完整 JD 读取、身份校验、SQLite 批次与快照、中断继续、资格与条件筛选，以及 JSONL／CSV 分组导出。32 项测试通过；首轮真实采集 30 条去重岗位，26 条取得正文，并完成 5 条页面抽查。
 
 仅支持 BOSS，平台页面或接口变化可能影响适配。完整 JD 来自带岗位 ID 的接口响应，或经 URL、canonical 链接、标题和公司一致性核对的页面正文；无法核对时保留失败状态，列表标签不冒充正文。测试边界见 [验证记录](docs/validation.md)。
 
@@ -63,7 +63,7 @@ node src/cli/index.js export --batch "批次ID" --min-salary 20
 
 ## 配置与数据
 
-仓库中的 `config/research.example.json` 是通用模板，搜索城市和关键词需要填写；可选筛选项默认为未指定，不对应任何真实求职者。
+仓库中的 `config/research.example.json` 是通用模板，搜索城市和关键词需要填写；个人资格与偏好默认为未指定，不对应任何真实求职者。默认启用完整正文质量门槛，缺正文记录不会进入通过清单。
 
 实际使用时复制为 `config/research.local.json`，再填写自己的条件。该文件以及登录资料、数据库和导出结果均被 Git 忽略。实际采集数据可在本机重新筛选，无需因修改薪资条件就重新访问招聘平台；若扩大城市或搜索词范围，则需要补充采集。
 
@@ -73,11 +73,34 @@ node src/cli/index.js export --batch "批次ID" --min-salary 20
 | `collection.maxUniqueJobs` | 批次去重上限 1～500；不是保证可取得数量 |
 | `preferences.titleInclude` | 标题包含任一词即满足，空数组不限制 |
 | `preferences.salary` | 月薪上下限，单位 K，区间有交集即满足；未知薪资待核实 |
-| `experienceInclude`、`educationInclude`、`industriesInclude`、`companyScalesInclude` | 规范化后的允许值精确匹配，不推断学历等级或行业上下位关系 |
+| `salary.periodInclude` | 允许的薪资周期：month、day、hour、year；例如仅接受月薪时填 month，不将日薪自动换算月薪 |
+| `candidate.educationLevel` | 可选候选学历；按岗位最低学历与候选学历比较，例如候选本科不能通过硕士硬要求 |
+| `candidate.experienceYears` | 可选候选工作年数，与岗位最低年限比较，无法解析时待核实 |
+| `candidate.challengeMaxRequiredYears` | 可接受挑战岗位的最低年限上限；此类记录单列 challenge，不混入主清单 |
+| `excludeInternships` | 是否排除标题或正文中明确的实习／在校专属岗位；日薪另由薪资周期条件控制 |
+| `requireCompleteDetails` | 默认 true，缺正文或正文未通过身份核验时进入待核实；列表研究可显式关闭 |
+| `experienceInclude`、`educationInclude`、`industriesInclude`、`companyScalesInclude` | 可选允许值精确匹配；与候选资格比较为不同功能，可分别设置 |
 | `employment.include/exclude/prefer` | 用工类型硬条件／排除／偏好；类型 `direct`、`outsourcing`、`onsite`、`agency` |
 | `excludeKeywords` | 标题、公司、标签及完整 JD 中的排除词；未取得正文时无法确认排除词不存在 |
 
-未配置的维度不限制；未知字段进入 `review`，已确认冲突进入 `rejected`，其余为 `matched`。`matched` 仅表示满足已设置的可核对条件，不代表个人能力适配、完整 JD 已取得或确认可投。用工性质仅识别正文中的少量明确陈述；无法判断的保持 `unknown`，偏好只用于排序。
+个人资格配置只保存在本地文件中；空值不限制相应维度。学历比较只支持明确的最低层级，复杂组合保留未知，不推断专业、学制等其他资格。
+
+筛选状态优先级：明确冲突 `rejected` → 信息不足 `review` → 年限超出但在允许挑战范围 `challenge` → 其余 `matched`。`matched` 仅表示通过已设结构化规则，不等于技能适配或确认可投；默认要求完整正文，但可以显式关闭该质量门槛。用工性质只识别有限明确陈述，未知不能视为直招，偏好只用于排序。公司线索辅助识别见 [后续需求](docs/backlog.md)。
+
+## 导出文件说明
+
+0.2.0 起 `jobs.csv` 改为仅含 matched 的通过清单，旧版同名文件曾包含全部记录。每次导出创建新目录，旧文件不会被覆盖。
+
+| 文件 | 内容 |
+| --- | --- |
+| `jobs.csv` | 通过所有已设条件的记录 |
+| `jobs-challenge.csv` | 年限稍高但在明确允许范围内的挑战记录 |
+| `jobs-review.csv` | 需要补正文、核对薪资或其他必要信息的记录 |
+| `jobs-rejected.csv` | 明确不符合至少一项条件，附原因 |
+| `jobs-all.csv`、`jobs.jsonl` | 全部采集记录与筛选证据，供审计与重新筛选 |
+| `summary.json` | 生效条件、各组计数和文件对应关系 |
+
+CSV 同时提供英文状态码与中文状态、可读筛选原因、详情缺失原因及证据。优先查看 jobs.csv 和 jobs-challenge.csv；审计全集中的 rejected 不是推荐结果。
 
 ## 测试与离线演示
 

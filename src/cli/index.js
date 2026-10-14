@@ -8,7 +8,7 @@ import { exportBatch } from '../export/index.js';
 import { collect } from '../collection.js';
 import { acquireLock } from '../browser/lock.js';
 
-const HELP = `Job Research 0.1.0 — 本地岗位采集与筛选（Node.js 24+）
+const HELP = `Job Research 0.2.0 — 本地岗位采集与筛选（Node.js 24+）
 
 用法: node src/cli/index.js <command> [options]
 

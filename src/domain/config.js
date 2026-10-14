@@ -1,11 +1,14 @@
 import { readFile } from 'node:fs/promises';
 import { ResearchError } from './errors.js';
+import { educationLevels } from './qualification.js';
 
 export const defaults = {
   schemaVersion: 1, platform: 'boss', regionName: null, keywords: [],
   collection: { maxUniqueJobs: 30, maxScrollsPerKeyword: 2, detailConcurrency: 1,
     detailIntervalMs: 3000, onAuthenticationOrVerification: 'pause' },
-  preferences: { salary: { minMonthlyK: null, maxMonthlyK: null, matchMode: 'overlap' },
+  preferences: { salary: { minMonthlyK: null, maxMonthlyK: null, matchMode: 'overlap', periodInclude: [] },
+    candidate: { educationLevel: null, experienceYears: null, challengeMaxRequiredYears: null },
+    excludeInternships: false, requireCompleteDetails: true,
     titleInclude: [], experienceInclude: [], educationInclude: [], industriesInclude: [], companyScalesInclude: [],
     employment: { include: [], exclude: [], prefer: [] }, excludeKeywords: [], unknownPolicy: 'keep_for_review' },
   exports: ['jsonl', 'csv', 'summary'],
@@ -26,7 +29,7 @@ export function validateConfig(input = {}, { requireSearch = false } = {}) {
   const c = merge(defaults, input);
   if (c.schemaVersion !== 1 || c.platform !== 'boss') fail('只支持 schemaVersion=1 和 platform=boss');
   if (c.regionName !== null && (typeof c.regionName !== 'string' || !c.regionName.trim())) fail('regionName 必须是非空城市名称或 null');
-  const arrays = [c.keywords, c.exports, c.preferences.titleInclude, c.preferences.experienceInclude, c.preferences.educationInclude,
+  const arrays = [c.keywords, c.exports, c.preferences.salary.periodInclude, c.preferences.titleInclude, c.preferences.experienceInclude, c.preferences.educationInclude,
     c.preferences.industriesInclude, c.preferences.companyScalesInclude, c.preferences.excludeKeywords,
     ...Object.values(c.preferences.employment)];
   if (arrays.some(a => !Array.isArray(a) || a.some(v => typeof v !== 'string' || !v.trim()))) fail('集合配置必须是非空字符串数组');
@@ -41,6 +44,12 @@ export function validateConfig(input = {}, { requireSearch = false } = {}) {
   const s = c.preferences.salary;
   for (const v of [s.minMonthlyK, s.maxMonthlyK]) if (v !== null && (typeof v !== 'number' || !Number.isFinite(v) || v < 0)) fail('月薪上下限必须是非负数字或 null');
   if (s.minMonthlyK !== null && s.maxMonthlyK !== null && s.minMonthlyK > s.maxMonthlyK) fail('月薪下限不能大于上限');
+  if(s.periodInclude.some(x=>!['month','day','hour','year'].includes(x))) fail('薪资周期可选 month、day、hour、year');
+  const candidate=c.preferences.candidate;
+  if(candidate.educationLevel!==null && !educationLevels.includes(candidate.educationLevel)) fail('候选学历必须是明确学历层级或 null');
+  for(const value of [candidate.experienceYears,candidate.challengeMaxRequiredYears]) if(value!==null && (typeof value!=='number' || !Number.isFinite(value) || value<0)) fail('候选经验与挑战上限必须是非负数字或 null');
+  if(candidate.challengeMaxRequiredYears!==null && (candidate.experienceYears===null || candidate.challengeMaxRequiredYears<candidate.experienceYears)) fail('挑战上限需要候选经验，且不能低于候选经验');
+  for(const key of ['excludeInternships','requireCompleteDetails']) if(typeof c.preferences[key]!=='boolean') fail(`${key} 必须为布尔值`);
   if (s.matchMode !== 'overlap' || c.preferences.unknownPolicy !== 'keep_for_review') fail('当前仅支持 overlap 和 keep_for_review');
   const types = ['direct', 'outsourcing', 'onsite', 'agency'];
   for (const values of Object.values(c.preferences.employment)) if (values.some(x => !types.includes(x))) fail(`用工类型可选 ${types.join(', ')}`);

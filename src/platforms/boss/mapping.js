@@ -35,11 +35,12 @@ export function mapDomDetail(snapshot, expected) {
   const path = `/job_detail/${expected.platformJobId}.html`;
   for(const value of [snapshot.url,snapshot.canonical]) {
     let url;
-    try { url=new URL(value); } catch { throw new ResearchError('DETAIL_MISSING','页面缺少可核对的岗位链接'); }
+    try { url=new URL(value); } catch { throw new ResearchError('DETAIL_LINK_UNAVAILABLE','页面缺少可核对的岗位链接'); }
     if(url.origin!=='https://www.zhipin.com' || url.pathname!==path) throw new ResearchError('IDENTITY_MISMATCH','页面岗位链接与目标不符');
   }
   const normalize = text => String(text || '').normalize('NFKC').replace(/\s/g,'');
-  if(!expected.title || !expected.company || !snapshot.title || !snapshot.company) throw new ResearchError('DETAIL_MISSING','页面缺少身份核验字段');
+  if(!expected.title || !snapshot.title) throw new ResearchError('DETAIL_TITLE_UNAVAILABLE','页面缺少可核对的岗位标题');
+  if(!expected.company || !snapshot.company) throw new ResearchError('DETAIL_COMPANY_UNAVAILABLE','页面缺少可与列表核对的公司字段');
   if(normalize(snapshot.title)!==normalize(expected.title) || normalize(snapshot.company)!==normalize(expected.company)) throw new ResearchError('IDENTITY_MISMATCH','页面标题或公司与列表不符，已拒绝写入');
   const expired=/已关闭|已下线|停止招聘|已结束/.test(snapshot.statusText || '');
   const description=typeof snapshot.description==='string'?snapshot.description.trim():'';

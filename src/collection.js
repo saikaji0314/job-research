@@ -52,7 +52,7 @@ export async function collect({ store, adapter, config, batchId, phase = 'all', 
         } catch(error) {
           abortIfNeeded(signal);
           if (isPause(error)) throw error;
-          const detailStatus = error.code==='IDENTITY_MISMATCH'?'identity_mismatch':error.code==='DETAIL_MISSING'?'missing':'failed';
+          const detailStatus = error.code==='IDENTITY_MISMATCH'?'identity_mismatch':/^DETAIL_(?:MISSING|(?:COMPANY|TITLE|LINK)_UNAVAILABLE)$/.test(error.code || '')?'missing':'failed';
           store.saveJob(id,{...job,description:'',detailStatus,detailSource:null,detailError:error.code || 'DETAIL_FAILED'},{kind:'detail',attempted:true});
           log(`详情 ${job.platformJobId}: ${detailStatus} (${error.code || 'DETAIL_FAILED'})`);
         }
