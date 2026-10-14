@@ -1,0 +1,11 @@
+{
+  "name": "job-research",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Configurable local job collection, filtering and export",
+  "engines": { "node": ">=24.0.0" },
+  "bin": { "job-research": "src/cli/index.js" },
+  "scripts": { "test": "node --test", "start": "node src/cli/index.js" },
+  "dependencies": { "patchright": "1.60.2" }
+}

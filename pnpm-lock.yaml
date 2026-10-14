@@ -1,0 +1,43 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      patchright:
+        specifier: 1.60.2
+        version: 1.60.2
+
+packages:
+
+  fsevents@2.3.2:
+    resolution: {integrity: sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==}
+    engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
+    os: [darwin]
+
+  patchright-core@1.60.2:
+    resolution: {integrity: sha512-AzUYfbXla1/VVvIKJYK+tOQkdx7PwIM5qSnxz7Hnf2CcRdnqnM6n+goPQl3JLlLdeLj0WA6xlzRn2w/Da7wD4g==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+  patchright@1.60.2:
+    resolution: {integrity: sha512-4gkWJllmwVcqrcAxjecy6XFsA2df/VXVPj5t+Ezimwm/LPr2QYY8nzcj2FBAb/3u67wu58EXAPLlIZzuFKbeqA==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+snapshots:
+
+  fsevents@2.3.2:
+    optional: true
+
+  patchright-core@1.60.2: {}
+
+  patchright@1.60.2:
+    dependencies:
+      patchright-core: 1.60.2
+    optionalDependencies:
+      fsevents: 2.3.2
