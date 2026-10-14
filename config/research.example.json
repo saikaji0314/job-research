@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "platform": "boss",
+  "regionName": null,
+  "keywords": [],
+  "collection": {
+    "maxUniqueJobs": 30,
+    "maxScrollsPerKeyword": 2,
+    "detailConcurrency": 1,
+    "detailIntervalMs": 3000,
+    "onAuthenticationOrVerification": "pause"
+  },
+  "preferences": {
+    "salary": {
+      "minMonthlyK": null,
+      "maxMonthlyK": null,
+      "matchMode": "overlap"
+    },
+    "experienceInclude": [],
+    "educationInclude": [],
+    "industriesInclude": [],
+    "companyScalesInclude": [],
+    "employment": {
+      "include": [],
+      "exclude": [],
+      "prefer": []
+    },
+    "excludeKeywords": [],
+    "unknownPolicy": "keep_for_review"
+  },
+  "exports": ["jsonl", "csv", "summary"]
+}

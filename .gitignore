@@ -1,0 +1,27 @@
+# Local credentials and browser state
+.env
+.env.*
+!.env.example
+.profiles/
+.auth/
+.local/
+config/*.local.json
+
+# Collected data and runtime artifacts
+data/
+output/
+logs/
+tmp/
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.log
+*.har
+
+# Dependencies and tooling
+node_modules/
+coverage/
+dist/
+.DS_Store
+Thumbs.db
