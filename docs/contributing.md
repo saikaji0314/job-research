@@ -23,4 +23,4 @@
 
 ## 当前开发入口
 
-先阅读 [设计](design.md) 和 [实施计划](implementation.md)。当前只有文档与配置模板，尚未提供可运行命令；实际环境要求和测试命令将在实现后补齐。
+先阅读 [设计](design.md)、[实施计划](implementation.md) 与 [验证记录](validation.md)。使用 Node.js 24+、pnpm 11 安装依赖，node --test 运行离线测试；JOB_RESEARCH_BROWSER_TEST=1 开启真实 Chrome 的完全本地拦截测试。依赖版本按锁文件安装；不要将开发者机器的运行时路径写进公共说明。
