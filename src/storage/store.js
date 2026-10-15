@@ -80,7 +80,7 @@ export class Store {
     return row || null;
   }
   saveAppCard(id,keyword,input,order,preselection,reason) {
-    const safe=Object.fromEntries(['title','listTitleRaw','company','city','salary','experience','degree','industry','companyScale','summary'].map(k=>[k,typeof input[k]==='string'?input[k].slice(0,10000):null]));
+    const safe=Object.fromEntries(['title','listTitleRaw','company','city','salary','experience','degree','industry','companyScale','summary','conditionVisibility'].map(k=>[k,typeof input[k]==='string'?input[k].slice(0,10000):null]));
     this.db.prepare(`INSERT INTO app_cards VALUES(?,?,?,?,?,?,?,NULL,NULL,NULL,?) ON CONFLICT(batch_id,keyword,fingerprint) DO UPDATE SET data=excluded.data,preselection=excluded.preselection,reason=excluded.reason`)
       .run(id,keyword,input.fingerprint,JSON.stringify(safe),order,preselection,reason,new Date().toISOString());
   }

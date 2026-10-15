@@ -75,6 +75,7 @@ node src/cli/index.js export --batch "批次ID" --min-salary 20
 | `collection.maxUniqueJobs` | 批次去重上限 1～500；不是保证可取得数量 |
 | `collection.source`、`searchSort` | 网页为 web/default；App 为 android-app/latest；不支持网页 latest |
 | `collection.targetMatchedJobs` | 可选 App 严格通过目标；null 不设目标；不把挑战、待核实或原始线索计入目标 |
+| `collection.appFilters` | App 经验多选、BOSS 活跃范围与沟通过职位开关，应用后重新打开核验；枚举见 [安卓采集](docs/android-app.md) |
 | `preferences.titleInclude` | 标题包含任一词即满足，空数组不限制 |
 | `preferences.salary` | 月薪上下限，单位 K，区间有交集即满足；未知薪资待核实 |
 | `salary.periodInclude` | 允许的薪资周期：month、day、hour、year；例如仅接受月薪时填 month，不将日薪自动换算月薪 |

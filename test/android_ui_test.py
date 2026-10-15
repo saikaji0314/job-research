@@ -84,6 +84,29 @@ class AndroidUiTests(unittest.TestCase):
         ET.SubElement(root,'node',{'resource-id':ui.PREFIX+'tv_description','text':'虚构正文'})
         self.assertTrue(ui.detail_ready(root))
 
+    def test_collapsed_header_requires_same_query_prior_receipt_and_observed_list_layout(self):
+        from types import SimpleNamespace
+        worker=ui.AppUi.__new__(ui.AppUi);worker.keyword='fixture';worker.city='示例城市'
+        worker.header_verified=True;worker.filter_receipt={'groups':{}}
+        worker.d=SimpleNamespace(app_current=lambda:{'activity':'.search.geek.activity.GeekSearchActivity'})
+        root=ET.Element('hierarchy')
+        for name,text in [('et_search','fixture'),('recyclerView_lable_filter',''),('recyclerView_list','')]:
+            ET.SubElement(root,'node',{'resource-id':ui.PREFIX+name,'text':text})
+        worker.snapshot=lambda:root
+        self.assertIs(worker.list_root(),root)
+        self.assertEqual(worker.condition_visibility,'collapsed-header-prior-verification')
+        worker.header_verified=False
+        with self.assertRaisesRegex(ui.UiError,'APP_SORT_UNVERIFIED'):
+            worker.list_root()
+        worker.header_verified=True
+        ui.by_id(root,'et_search').set('text','other')
+        with self.assertRaisesRegex(ui.UiError,'APP_QUERY_MISMATCH'):
+            worker.list_root()
+        ui.by_id(root,'et_search').set('text','fixture')
+        ET.SubElement(root,'node',{'resource-id':ui.PREFIX+'tv_tab_label','text':'综合排序'})
+        with self.assertRaisesRegex(ui.UiError,'APP_SORT_UNVERIFIED'):
+            worker.list_root()
+
 
 
 if __name__ == '__main__':

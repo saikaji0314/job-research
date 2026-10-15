@@ -136,6 +136,8 @@ class AppUi:
         self.keyword = None
         self.city = None
         self.filter_receipt = None
+        self.header_verified = False
+        self.condition_visibility = None
 
     def snapshot(self):
         root = ET.fromstring(self.d.dump_hierarchy(compressed=False))
@@ -181,6 +183,18 @@ class AppUi:
         if text_of(root, 'et_search') != self.keyword:
             raise UiError('APP_QUERY_MISMATCH')
         labels = [n.get('text') for n in root.iter('node') if n.get('resource-id') == PREFIX+'tv_tab_label']
+        has_sort = any(s in labels for s in ['最新优先','综合排序','距离优先'])
+        if not has_sort:
+            # Observed RecyclerView scrolling hides the entire native-condition row until returning to top.
+            # Keep its prior receipt only on the same verified query and the specific collapsed list layout.
+            collapsed = (getattr(self,'header_verified',False) and getattr(self,'filter_receipt',None)
+                         and by_id(root,'recyclerView_lable_filter') is not None and by_id(root,'recyclerView_list') is not None
+                         and self.d.app_current().get('activity','').endswith('.search.geek.activity.GeekSearchActivity')
+                         and not any(str(s).startswith('筛选') for s in labels))
+            if not collapsed:
+                raise UiError('APP_SORT_UNVERIFIED')
+            self.condition_visibility = 'collapsed-header-prior-verification'
+            return root
         if '最新优先' not in labels:
             raise UiError('APP_SORT_UNVERIFIED')
         if self.city.rstrip('市') not in [str(t).rstrip('市') for t in labels]:
@@ -191,6 +205,8 @@ class AppUi:
             actual = next((s for s in labels if str(s).startswith('筛选')),None)
             if actual != ('筛选·'+str(count) if count else '筛选'):
                 raise UiError('APP_FILTERS_UNVERIFIED')
+        self.header_verified = True
+        self.condition_visibility = 'visible'
         return root
 
     def open_editor(self):
@@ -303,6 +319,7 @@ class AppUi:
 
     def search(self, keyword, city, filters=None):
         self.filter_receipt = None
+        self.header_verified = False
         # A previous stopped inspection may have left the native filter sheet open.
         if by_id(self.snapshot(),'btn_confirm') is not None:
             self.click(by_id(self.snapshot(),'btn_confirm'),True)
@@ -326,9 +343,11 @@ class AppUi:
         for _ in range(20):
             root = self.list_root()
             cards = parse_cards(root)
+            for card in cards:
+                card['conditionVisibility'] = self.condition_visibility
             empty = any(n.get('text') in ['暂无相关职位','暂无职位','没有找到相关职位','暂时没有符合条件的职位'] for n in root.iter('node'))
             if cards or empty:
-                return {'cards':cards, 'keyword':self.keyword, 'sort':'latest', 'city':self.city,'filters':self.filter_receipt}
+                return {'cards':cards, 'keyword':self.keyword, 'sort':'latest', 'city':self.city,'filters':self.filter_receipt,'conditionVisibility':self.condition_visibility}
             time.sleep(.4)
         raise UiError('APP_LIST_UNAVAILABLE')
 
