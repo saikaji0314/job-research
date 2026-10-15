@@ -8,7 +8,7 @@ import { exportBatch } from '../export/index.js';
 import { collect } from '../collection.js';
 import { acquireLock } from '../browser/lock.js';
 
-const HELP = `Job Research 0.2.0 — 本地岗位采集与筛选（Node.js 24+）
+const HELP = `Job Research 0.3.0 — 本地岗位采集与筛选（Node.js 24+）
 
 用法: node src/cli/index.js <command> [options]
 
@@ -26,6 +26,7 @@ const HELP = `Job Research 0.2.0 — 本地岗位采集与筛选（Node.js 24+�
   --keywords <a,b>      覆盖搜索词（英文逗号分隔）
   --min-salary <K>      月薪下限，区间重叠匹配
   --max-salary <K>      月薪上限
+  --published-within-days <n>  最近 n 个自然日发布（含今天，按北京时间）
   --limit <n>           批次去重上限（1～500）
   --db <file>           数据库，默认 data/jobs.db
   --output <dir>        导出根目录，默认 output
@@ -34,6 +35,7 @@ const HELP = `Job Research 0.2.0 — 本地岗位采集与筛选（Node.js 24+�
   --timeout <seconds>   login 等待时间，默认 300 秒
   --resume <id>         继续批次，使用该批次原有搜索配置
   --retry-failed        详情阶段重试之前未取得完整正文的岗位
+  --refresh-details     重新读取已有完整详情及其日期；历史快照保留
   --headless           无头采集（login 不支持）
   --help               显示帮助
 
@@ -45,12 +47,13 @@ async function main() {
     'min-salary':{type:'string'}, 'max-salary':{type:'string'}, limit:{type:'string'}, db:{type:'string',default:'data/jobs.db'},
     output:{type:'string',default:'output'}, 'profile-dir':{type:'string',default:'.profiles/boss'}, browser:{type:'string',default:'chrome'},
     timeout:{type:'string',default:'300'}, resume:{type:'string'}, batch:{type:'string'}, phase:{type:'string',default:'all'},
-    'retry-failed':{type:'boolean',default:false}, headless:{type:'boolean',default:false}, input:{type:'string'},
+    'retry-failed':{type:'boolean',default:false}, 'refresh-details':{type:'boolean',default:false},
+    'published-within-days':{type:'string'}, headless:{type:'boolean',default:false}, input:{type:'string'},
   } });
   if(v.help || !positionals.length) { console.log(HELP); return; }
   const command = positionals[0];
   if(positionals.length!==1 || !['validate','login','collect','batches','export','import-fixture'].includes(command)) throw new ResearchError('INVALID_COMMAND','未知命令，使用 --help 查看用法');
-  const overrides = { city:v.city,keywords:v.keywords,minSalary:v['min-salary'],maxSalary:v['max-salary'],limit:v.limit };
+  const overrides = { city:v.city,keywords:v.keywords,minSalary:v['min-salary'],maxSalary:v['max-salary'],limit:v.limit,publishedWithinDays:v['published-within-days'] };
   const changed = Object.values(overrides).some(value=>value!==undefined) || v.config;
   let config = await loadConfig(v.config,overrides);
   if(command==='validate') { validateConfig(config,{requireSearch:true}); console.log('配置有效'); return; }
@@ -78,7 +81,9 @@ async function main() {
       if(!v.batch) throw new ResearchError('BATCH_REQUIRED','export 需要 --batch');
       if(!v.config) config = applyOverrides(store.batch(v.batch).config, overrides);
       const result = await exportBatch(store,v.batch,config,v.output);
-      console.log(`已导出 ${result.summary.jobs} 个岗位：${result.dir}`); return;
+      console.log(`已导出 ${result.summary.jobs} 个岗位：${result.dir}`);
+      for(const warning of result.summary.warnings) console.log(`提示：${warning}`);
+      return;
     }
     if(command==='import-fixture') {
       if(!v.input) throw new ResearchError('INPUT_REQUIRED','import-fixture 需要 --input');
@@ -99,13 +104,14 @@ async function main() {
     session = await openSession({profileDir:v['profile-dir'],browser:v.browser,headless:v.headless});
     let batchId;
     try { batchId = await collect({store,adapter:new BossAdapter(session.page),config,batchId:v.resume,phase:v.phase,
-      retryFailed:v['retry-failed'],signal:controller.signal,log:console.log}); }
+      retryFailed:v['retry-failed'],refreshDetails:v['refresh-details'],signal:controller.signal,log:console.log}); }
     catch(error) {
       if(error.batchId) { const result = await exportBatch(store,error.batchId,config,v.output); console.log(`阶段性结果 ${result.dir}`); }
       throw error;
     }
     const result = await exportBatch(store,batchId,config,v.output);
     console.log(`采集结束，状态 ${result.summary.batchStatus}，${result.summary.jobs} 个岗位。导出 ${result.dir}`);
+    for(const warning of result.summary.warnings) console.log(`提示：${warning}`);
   } finally {
     if(session) await session.close().catch(()=>{});
     if(release) await release();

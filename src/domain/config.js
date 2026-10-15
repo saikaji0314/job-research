@@ -8,7 +8,7 @@ export const defaults = {
     detailIntervalMs: 3000, onAuthenticationOrVerification: 'pause' },
   preferences: { salary: { minMonthlyK: null, maxMonthlyK: null, matchMode: 'overlap', periodInclude: [] },
     candidate: { educationLevel: null, experienceYears: null, challengeMaxRequiredYears: null },
-    excludeInternships: false, requireCompleteDetails: true,
+    excludeInternships: false, requireCompleteDetails: true, publishedWithinDays: null,
     titleInclude: [], experienceInclude: [], educationInclude: [], industriesInclude: [], companyScalesInclude: [],
     employment: { include: [], exclude: [], prefer: [] }, excludeKeywords: [], unknownPolicy: 'keep_for_review' },
   exports: ['jsonl', 'csv', 'summary'],
@@ -50,6 +50,7 @@ export function validateConfig(input = {}, { requireSearch = false } = {}) {
   for(const value of [candidate.experienceYears,candidate.challengeMaxRequiredYears]) if(value!==null && (typeof value!=='number' || !Number.isFinite(value) || value<0)) fail('候选经验与挑战上限必须是非负数字或 null');
   if(candidate.challengeMaxRequiredYears!==null && (candidate.experienceYears===null || candidate.challengeMaxRequiredYears<candidate.experienceYears)) fail('挑战上限需要候选经验，且不能低于候选经验');
   for(const key of ['excludeInternships','requireCompleteDetails']) if(typeof c.preferences[key]!=='boolean') fail(`${key} 必须为布尔值`);
+  if(c.preferences.publishedWithinDays!==null && (!Number.isSafeInteger(c.preferences.publishedWithinDays) || c.preferences.publishedWithinDays<1 || c.preferences.publishedWithinDays>3650)) fail('publishedWithinDays 必须是 1～3650 的整数或 null');
   if (s.matchMode !== 'overlap' || c.preferences.unknownPolicy !== 'keep_for_review') fail('当前仅支持 overlap 和 keep_for_review');
   const types = ['direct', 'outsourcing', 'onsite', 'agency'];
   for (const values of Object.values(c.preferences.employment)) if (values.some(x => !types.includes(x))) fail(`用工类型可选 ${types.join(', ')}`);
@@ -72,5 +73,6 @@ export function applyOverrides(input, overrides = {}, options = {}) {
   if (overrides.minSalary !== undefined) c.preferences.salary.minMonthlyK = Number(overrides.minSalary);
   if (overrides.maxSalary !== undefined) c.preferences.salary.maxMonthlyK = Number(overrides.maxSalary);
   if (overrides.limit !== undefined) c.collection.maxUniqueJobs = Number(overrides.limit);
+  if (overrides.publishedWithinDays !== undefined) c.preferences.publishedWithinDays = Number(overrides.publishedWithinDays);
   return validateConfig(c, options);
 }

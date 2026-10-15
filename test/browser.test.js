@@ -14,7 +14,7 @@ test('Chrome local-fixture integration: discovery, full JD, mismatched ID, login
         const request=route.request(),url=new URL(request.url());requests.push({path:url.pathname,method:request.method()});
         if(url.hostname!=='www.zhipin.com') return route.abort();
         if(url.pathname==='/wapi/zpgeek/search/joblist.json') return route.fulfill({json:{code:0,zpData:{hasMore:false,jobList:[{encryptJobId:'fixture-browser',jobName:'虚构岗位',brandName:'虚构公司',salaryDesc:'18-28K',jobExperience:'1-3年'}]}}});
-        if(url.pathname==='/wapi/zpgeek/job/detail.json') return route.fulfill({json:{code:0,zpData:{jobInfo:{encryptId:url.searchParams.get('id'),jobName:'虚构岗位',postDescription:'岗位职责：开发接口。\n本公司直招。此内容完全虚构。'}}}});
+        if(url.pathname==='/wapi/zpgeek/job/detail.json') return route.fulfill({json:{code:0,zpData:{jobInfo:{encryptId:url.searchParams.get('id'),jobName:'虚构岗位',publishTime:'2025-06-01',postDescription:'岗位职责：开发接口。\n本公司直招。此内容完全虚构。'}}}});
         const auth='<nav><ul><li class="nav-figure">虚构登录标记</li></ul></nav>';
         let html;
         if(url.pathname.includes('verify')) html='<div>本地验证页面</div>';
@@ -32,6 +32,7 @@ test('Chrome local-fixture integration: discovery, full JD, mismatched ID, login
       const result=await adapter.discover({keyword:'sample',cityCode:'fixture-city',maxScrolls:1,limit:3,onBatch:async batch=>jobs.push(...batch)});
       assert.equal(result.discovered,1);assert.equal(jobs[0].detailStatus,'pending');assert.equal(jobs[0].description,'');
       const detail=await adapter.detail(jobs[0]);assert.equal(detail.detailStatus,'complete');assert.equal(detail.employmentType,'direct');
+      assert.equal(detail.publishedAt,'2025-06-01');
       assert.ok(detail.description.includes('此内容完全虚构'));
       const dom=await adapter.detail({...jobs[0],platformJobId:'dom-fixture',href:'https://www.zhipin.com/job_detail/dom-fixture.html'});
       assert.equal(dom.detailStatus,'complete');assert.equal(dom.detailSource,'verified-dom');

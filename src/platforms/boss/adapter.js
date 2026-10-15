@@ -2,6 +2,7 @@ import { assertBossUrl, requireAuthenticated } from '../../browser/session.js';
 import { ResearchError, abortIfNeeded } from '../../domain/errors.js';
 import { mapListJob, mapDetail, mapDomDetail, resolveRegion, searchUrl, decodeBossText } from './mapping.js';
 import { sanitizeJob } from '../../domain/job.js';
+import {pageDateEvidence} from './dates.js';
 
 const CARD = 'li.job-card-wrapper, ul.rec-job-list li.job-card-box, .job-list-container li.job-card-box';
 const LIST_PATHS = ['/wapi/zpgeek/search/joblist.json','/wapi/zpgeek/pc/recommend/job/list.json'];
@@ -125,19 +126,22 @@ export class BossAdapter {
       await this.authenticate();
       await this.page.waitForTimeout(500);
       await Promise.all([...pending]);
+      const snapshot=await this.page.evaluate(()=> {
+        const scoped=document.querySelectorAll('.job-detail-section > .job-sec-text');
+        const sections=scoped.length?scoped:document.querySelectorAll('.job-sec-text');
+        return {url:location.href,canonical:document.querySelector('link[rel="canonical"]')?.getAttribute('href'),
+          title:document.querySelector('h1')?.textContent?.trim(),company:document.querySelector('.sider-company .company-info')?.textContent?.trim(),
+          description:sections.length===1?sections[0].innerText:'',statusText:document.querySelector('.job-status')?.textContent?.trim() || '',
+          jsonLd:[...document.querySelectorAll('script[type="application/ld+json"]')].map(e=>e.textContent),
+          dateLabels:[...document.querySelectorAll('.job-author .gray, .job-author .time, .job-detail .update-time, .job-banner .publish-time, .job-detail .publish-time')]
+            .map(e=>e.innerText?.trim()).filter(text=>text && text.length<=120 && /^(?:发布时间|发布日期|发布于|更新时间|更新于|页面更新时间)/.test(text))};
+      });
       const candidates = responses.filter(p => (p.zpData?.jobInfo?.encryptId || p.zpData?.jobInfo?.encryptJobId) === job.platformJobId);
       if (!candidates.length) {
         if (responses.some(p => p.zpData?.jobInfo)) throw new ResearchError('IDENTITY_MISMATCH', '响应属于其他岗位，已拒绝写入');
-        const snapshot=await this.page.evaluate(()=> {
-          const scoped=document.querySelectorAll('.job-detail-section > .job-sec-text');
-          const sections=scoped.length?scoped:document.querySelectorAll('.job-sec-text');
-          return {url:location.href,canonical:document.querySelector('link[rel="canonical"]')?.getAttribute('href'),
-            title:document.querySelector('h1')?.textContent?.trim(),company:document.querySelector('.sider-company .company-info')?.textContent?.trim(),
-            description:sections.length===1?sections[0].innerText:'',statusText:document.querySelector('.job-status')?.textContent?.trim() || ''};
-        });
         return mapDomDetail(snapshot,job);
       }
-      return mapDetail(candidates.at(-1),job);
+      return mapDetail(candidates.at(-1),job,pageDateEvidence(snapshot,job));
     } catch(error) {
       if(this.page.isClosed()) throw new ResearchError('BROWSER_CLOSED','浏览器已关闭，采集已暂停');
       throw error;

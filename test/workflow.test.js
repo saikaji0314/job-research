@@ -67,6 +67,20 @@ test('identity mismatch is saved as failure with no body and prior evidence reta
     assert.equal(store.jobs(id)[0].detailAttempts,2);assert.equal(store.batch(id).status,'complete');
   }finally{store.close();}
 });
+test('explicit refresh re-reads completed details, saves dates and retains prior snapshots',async()=> {
+  const store=new Store(':memory:');let reads=0;
+  try {
+    const c=config(),id=store.createBatch(c);
+    store.saveJob(id,{...job('one'),description:'虚构旧正文',detailStatus:'complete',detailSource:'fixture'},{kind:'detail',attempted:true});
+    const adapter=fake({detail:async j=>{reads++;return {...j,description:'虚构新正文',dateEvidence:[{kind:'published',raw:'2026-10-01',source:'fixture:datePosted',observedAt:'2026-10-15T04:00:00Z'}]};}});
+    await collect({store,config:c,batchId:id,phase:'details',adapter});assert.equal(reads,0);
+    await collect({store,config:c,batchId:id,phase:'details',refreshDetails:true,adapter});
+    assert.equal(reads,1);assert.equal(store.jobs(id)[0].publishedAt,'2026-10-01');assert.equal(store.jobs(id)[0].detailAttempts,2);
+    const snapshots=store.db.prepare("SELECT data FROM snapshots WHERE batch_id=? AND kind='detail' ORDER BY id").all(id);
+    assert.equal(snapshots.length,2);assert.equal(JSON.parse(snapshots[0].data).description,'虚构旧正文');assert.equal(JSON.parse(snapshots[1].data).description,'虚构新正文');
+  }finally{store.close();}
+});
+
 test('exports preserve raw data, multiline CSV, formulas, and separate re-filter configurations',async()=> {
   const dir=await mkdtemp(join(tmpdir(),'job-research-test-')),store=new Store(join(dir,'test.db'));
   try {

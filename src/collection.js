@@ -1,7 +1,7 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import { ResearchError, isPause, abortIfNeeded } from './domain/errors.js';
 
-export async function collect({ store, adapter, config, batchId, phase = 'all', retryFailed = false, signal, log = () => {} }) {
+export async function collect({ store, adapter, config, batchId, phase = 'all', retryFailed = false, refreshDetails = false, signal, log = () => {} }) {
   const id = batchId || store.createBatch(config);
   const batch = store.batch(id);
   // A resumed batch always uses the original search plan. Filtering can change independently on export.
@@ -44,7 +44,7 @@ export async function collect({ store, adapter, config, batchId, phase = 'all', 
       const jobs = store.jobs(id);
       for (const job of jobs) {
         abortIfNeeded(signal);
-        if (job.detailStatus==='complete' || (job.detailStatus!=='pending' && !retryFailed)) continue;
+        if (!refreshDetails && (job.detailStatus==='complete' || (job.detailStatus!=='pending' && !retryFailed))) continue;
         try {
           const detail = await adapter.detail(job);
           store.saveJob(id,detail,{kind:'detail',attempted:true});

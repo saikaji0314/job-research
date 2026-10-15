@@ -25,5 +25,10 @@ test('CLI fixture import and re-filter export run offline with no browser depend
     const filtered=summaries.find(x=>x.config.preferences.salary.minMonthlyK===20);
     assert.deepEqual(filtered.selection,{matched:1,rejected:1,review:1});
     assert.equal(run(['collect','--resume',id,'--city','other','--db',db]).status,1);
+    const fresh=run(['export','--batch',id,'--published-within-days','30','--db',db,'--output',out]);
+    assert.equal(fresh.status,0,fresh.stderr);assert.match(fresh.stdout,/缺少有效发布时间/);
+    const after=await readdir(join(out,id));
+    const freshSummary=(await Promise.all(after.map(async value=>JSON.parse(await readFile(join(out,id,value,'summary.json'),'utf8'))))).find(x=>x.config.preferences.publishedWithinDays===30);
+    assert.equal(freshSummary.csvFiles['jobs.csv'],0);assert.equal(freshSummary.csvFiles['jobs-review.csv'],3);
   }finally{await rm(dir,{recursive:true,force:true});}
 });
