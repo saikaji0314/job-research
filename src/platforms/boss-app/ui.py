@@ -307,7 +307,19 @@ class AppUi:
         self.filter_receipt = receipt
 
     def ensure_latest(self):
-        root = self.wait(lambda r:any(n.get('resource-id')==PREFIX+'tv_tab_label' and n.get('text') in ['最新优先','综合排序','距离优先'] for n in r.iter('node')))
+        root = self.wait(lambda r:by_id(r,'tv_search') is None and by_id(r,'et_search') is not None and
+                         (by_id(r,'recyclerView_list') is not None or any(n.get('resource-id')==PREFIX+'tv_tab_label' and n.get('text') in ['最新优先','综合排序','距离优先'] for n in r.iter('node'))))
+        for _ in range(30):
+            if any(n.get('resource-id')==PREFIX+'tv_tab_label' and n.get('text') in ['最新优先','综合排序','距离优先'] for n in root.iter('node')):
+                break
+            if text_of(root,'et_search')!=self.keyword or by_id(root,'recyclerView_lable_filter') is None:
+                raise UiError('APP_SORT_UNVERIFIED')
+            # Repeating an existing query can retain its scrolled list and collapsed header.
+            self.d.swipe(self.width*.9,self.height*.3,self.width*.9,self.height*.88,.3)
+            time.sleep(.2)
+            root = self.snapshot()
+        else:
+            raise UiError('APP_SORT_UNVERIFIED')
         labels = [n for n in root.iter('node') if n.get('resource-id')==PREFIX+'tv_tab_label']
         if not any(n.get('text')=='最新优先' for n in labels):
             choice = next((n for n in labels if n.get('text') in ['综合排序','距离优先']),None)
@@ -330,6 +342,7 @@ class AppUi:
             raise UiError('APP_QUERY_MISMATCH')
         self.click(by_id(self.snapshot(), 'tv_search'), True)
         self.stage = 'search-result'
+        self.keyword, self.city = keyword, city
         self.ensure_latest()
         self.stage = 'sort-result'
         self.keyword, self.city = keyword, city

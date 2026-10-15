@@ -107,6 +107,22 @@ class AndroidUiTests(unittest.TestCase):
         with self.assertRaisesRegex(ui.UiError,'APP_SORT_UNVERIFIED'):
             worker.list_root()
 
+    def test_search_recovers_controls_from_retained_scroll_before_checking_sort(self):
+        from types import SimpleNamespace
+        worker=ui.AppUi.__new__(ui.AppUi);worker.keyword='fixture';worker.width=1440;worker.height=3200
+        root=ET.Element('hierarchy')
+        for name,text in [('et_search','fixture'),('recyclerView_lable_filter',''),('recyclerView_list','')]:
+            ET.SubElement(root,'node',{'resource-id':ui.PREFIX+name,'text':text})
+        worker.snapshot=lambda:root
+        worker.wait=lambda predicate:root if predicate(root) else self.fail('Unexpected wait')
+        swipes=[]
+        def swipe(*args):
+            swipes.append(args)
+            ET.SubElement(root,'node',{'resource-id':ui.PREFIX+'tv_tab_label','text':'最新优先'})
+        worker.d=SimpleNamespace(swipe=swipe)
+        worker.ensure_latest()
+        self.assertEqual(len(swipes),1)
+
 
 
 if __name__ == '__main__':
