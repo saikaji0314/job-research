@@ -9,6 +9,21 @@ spec.loader.exec_module(ui)
 
 
 class AndroidUiTests(unittest.TestCase):
+    def test_different_truncated_company_labels_remain_unverified(self):
+        card={'title':'虚构工程师','company':'虚构示例企业...'}
+        with self.assertRaisesRegex(ui.UiError,'DETAIL_COMPANY_UNAVAILABLE'):
+            ui.verify_identity(card,'虚构工程师','虚构示例企业.....')
+        with self.assertRaisesRegex(ui.UiError,'IDENTITY_MISMATCH'):
+            ui.verify_identity(card,'其他职位','虚构示例企业...')
+        with self.assertRaisesRegex(ui.UiError,'IDENTITY_MISMATCH'):
+            ui.verify_identity(card,'虚构工程师','另一家企业')
+        with self.assertRaisesRegex(ui.UiError,'IDENTITY_MISMATCH'):
+            ui.verify_identity(card,'虚构工程师','虚构示例企业.....','其他完整公司名称')
+        self.assertEqual(ui.verify_identity(card,'虚构工程师','虚构示例企业.....','虚构示例企业咨询有限公司'),
+                         'same-truncated-display-prefix-with-detail-full-company')
+        with self.assertRaisesRegex(ui.UiError,'DETAIL_COMPANY_UNAVAILABLE'):
+            ui.verify_identity({'title':'虚构工程师','company':'示例...'},'虚构工程师','示例.....','示例有限公司')
+        ui.verify_identity({'title':'虚构工程师','company':'虚构公司'},'虚构工程师','虚构公司')
     def test_filter_categories_scope_identical_unlimited_labels(self):
         root=ET.Element('hierarchy')
         for name,selected in [('学历要求','不限'),('BOSS活跃（单选）','3日内活跃')]:

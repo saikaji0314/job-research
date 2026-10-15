@@ -67,7 +67,7 @@ export async function collectApp({store,driver,config,batchId,signal,log=()=>{}}
             failures=0;log(`${keyword}：已核验 ${store.jobs(id).length} 条详情，严格通过 ${matched()}${target?'/'+target:''}；列表线索 ${store.appCardCount(id)}`);
           }catch(error) {
             store.setAppCardResult(id,keyword,card.fingerprint,'failed',null,error.code || 'APP_DETAIL_FAILED');
-            if(!['DETAIL_MISSING','DETAIL_EXPANSION_UNAVAILABLE','APP_CARD_MOVED'].includes(error.code))throw error;
+            if(!['DETAIL_MISSING','DETAIL_COMPANY_UNAVAILABLE','DETAIL_EXPANSION_UNAVAILABLE','APP_CARD_MOVED'].includes(error.code))throw error;
             failures++;log(`${keyword}：详情未取得 ${error.code}，保留列表证据`);
             if(failures>=3)throw new ResearchError('APP_STATE_CHANGED','连续三条详情无法核实，停止扩量');
             if(error.code!=='APP_CARD_MOVED')await driver.call('recover');

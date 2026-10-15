@@ -70,3 +70,11 @@ test('App refuses unverified ordering and reports an unmet strict target',async(
     assert.equal(store.batch(id).status,'completed_with_gaps');assert.equal(store.batch(id).reason,'TARGET_NOT_REACHED');
   }finally{store.close();}
 });
+test('An isolated unreadable company remains a raw lead and never becomes a matched job',async()=>{
+  const store=new Store(':memory:'),driver=fake([card('unverified')],{error:'DETAIL_COMPANY_UNAVAILABLE'});
+  try {
+    const id=await collectApp({store,driver,config:config({targetMatchedJobs:1})});
+    assert.equal(store.jobs(id).length,0);assert.equal(store.appCards(id)[0].error,'DETAIL_COMPANY_UNAVAILABLE');
+    assert.equal(store.batch(id).reason,'TARGET_NOT_REACHED');assert.ok(driver.calls.some(x=>x.op==='recover'));
+  }finally{store.close();}
+});

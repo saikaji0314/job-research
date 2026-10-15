@@ -45,6 +45,23 @@ def detail_ready(root):
     return all(text_of(root, name) for name in ['tv_job_name','tv_boss_title','tv_description'])
 
 
+def verify_identity(card, title, company, full_company=None):
+    if norm(title)!=norm(card['title']):
+        raise UiError('IDENTITY_MISMATCH')
+    truncated = lambda s: bool(re.search(r'(?:\.{3,}|…+)$',norm(s)))
+    if norm(company)==norm(card['company']) and not truncated(company):
+        return 'exact-title-and-company'
+    strip_ellipsis = lambda s: re.sub(r'(?:\.{3,}|…+)$','',norm(s))
+    prefix = strip_ellipsis(company)
+    if truncated(company) and truncated(card['company']) and prefix==strip_ellipsis(card['company']):
+        if len(prefix)<6 or not full_company or truncated(full_company):
+            raise UiError('DETAIL_COMPANY_UNAVAILABLE')
+        if not norm(full_company).startswith(prefix):
+            raise UiError('IDENTITY_MISMATCH')
+        return 'same-truncated-display-prefix-with-detail-full-company'
+    raise UiError('IDENTITY_MISMATCH')
+
+
 def card_key(card):
     fields = ['title', 'company', 'city', 'salary', 'experience', 'degree']
     return hashlib.sha256(json.dumps([norm(card.get(k)) for k in fields], ensure_ascii=False).encode()).hexdigest()
@@ -421,8 +438,12 @@ class AppUi:
         root = self.wait(detail_ready,timeout=18)
         title = text_of(root, 'tv_job_name')
         company_short = re.split(r'[•·]', text_of(root, 'tv_boss_title'))[0].strip()
-        if norm(title) != norm(card['title']) or norm(company_short) != norm(card['company']):
-            raise UiError('IDENTITY_MISMATCH')
+        try:
+            comparison = verify_identity(card,title,company_short)
+        except UiError as error:
+            if error.code!='DETAIL_COMPANY_UNAVAILABLE':
+                raise
+            comparison = None
         result = {k:card.get(k, '') for k in ['title','company','salary','city','experience','degree','industry','companyScale','summary','listTitleRaw']}
         for name, field in [('tv_job_salary','salary'),('tv_required_location','city'),('tv_required_work_exp','experience'),('tv_required_degree','degree'),('tv_public_time','publicationLabelRaw')]:
             value = text_of(root, name)
@@ -431,6 +452,14 @@ class AppUi:
         self.stage = 'detail-expand'
         result['description'] = self.expand(root)
         result['companyFullName'] = text_of(self.snapshot(), 'tv_com_name')
+        if comparison is None:
+            for _ in range(4):
+                if result['companyFullName']:
+                    break
+                self.d.swipe(self.width*.5,self.height*.8,self.width*.5,self.height*.4,.5)
+                time.sleep(.4)
+                result['companyFullName'] = text_of(self.snapshot(),'tv_com_name')
+            comparison = verify_identity(card,title,company_short,result['companyFullName'])
         # Fresh sentinel prevents stale clipboard contents from being assigned to another job.
         sentinel = 'job-research-'+uuid.uuid4().hex
         self.d.set_clipboard(sentinel, 'job-research')
@@ -456,7 +485,8 @@ class AppUi:
         else:
             raise UiError('APP_JOB_LINK_UNAVAILABLE')
         self.back_to_list()
-        result['identityEvidence'] = json.dumps({'method':'app-title-company-and-fresh-copy-link', 'listTitle':card['title'], 'detailTitle':title, 'listCompany':card['company'], 'detailCompany':company_short},ensure_ascii=False)
+        result['identityEvidence'] = json.dumps({'method':'app-title-company-and-fresh-copy-link','companyComparison':comparison,
+            'listTitle':card['title'],'detailTitle':title,'listCompany':card['company'],'detailCompany':company_short,'detailFullCompany':result['companyFullName']},ensure_ascii=False)
         result.update(detailStatus='complete', detailSource='verified-app-ui', sourceChannel='android-app', searchSort='latest')
         return result
 
