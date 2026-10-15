@@ -4,7 +4,8 @@ import { educationLevels } from './qualification.js';
 
 export const defaults = {
   schemaVersion: 1, platform: 'boss', regionName: null, keywords: [],
-  collection: { maxUniqueJobs: 30, maxScrollsPerKeyword: 2, detailConcurrency: 1,
+  collection: { source:'web',searchSort:'default',targetMatchedJobs:null,
+    appFilters:{experienceInclude:[],bossActivity:null,showContactedWithin30Days:null},maxUniqueJobs: 30, maxScrollsPerKeyword: 2, detailConcurrency: 1,
     detailIntervalMs: 3000, onAuthenticationOrVerification: 'pause' },
   preferences: { salary: { minMonthlyK: null, maxMonthlyK: null, matchMode: 'overlap', periodInclude: [] },
     candidate: { educationLevel: null, experienceYears: null, challengeMaxRequiredYears: null },
@@ -29,7 +30,7 @@ export function validateConfig(input = {}, { requireSearch = false } = {}) {
   const c = merge(defaults, input);
   if (c.schemaVersion !== 1 || c.platform !== 'boss') fail('只支持 schemaVersion=1 和 platform=boss');
   if (c.regionName !== null && (typeof c.regionName !== 'string' || !c.regionName.trim())) fail('regionName 必须是非空城市名称或 null');
-  const arrays = [c.keywords, c.exports, c.preferences.salary.periodInclude, c.preferences.titleInclude, c.preferences.experienceInclude, c.preferences.educationInclude,
+  const arrays = [c.keywords, c.exports, c.collection.appFilters.experienceInclude, c.preferences.salary.periodInclude, c.preferences.titleInclude, c.preferences.experienceInclude, c.preferences.educationInclude,
     c.preferences.industriesInclude, c.preferences.companyScalesInclude, c.preferences.excludeKeywords,
     ...Object.values(c.preferences.employment)];
   if (arrays.some(a => !Array.isArray(a) || a.some(v => typeof v !== 'string' || !v.trim()))) fail('集合配置必须是非空字符串数组');
@@ -39,6 +40,16 @@ export function validateConfig(input = {}, { requireSearch = false } = {}) {
     if (!Number.isSafeInteger(c.collection[key]) || c.collection[key] < 0) fail(`collection.${key} 必须是非负整数`);
   }
   if (c.collection.maxUniqueJobs < 1 || c.collection.maxUniqueJobs > 500) fail('maxUniqueJobs 必须在 1～500 之间');
+  if(!['web','android-app'].includes(c.collection.source) || !['default','latest'].includes(c.collection.searchSort)) fail('采集来源或排序值无效');
+  if(c.collection.source==='web' && (c.collection.searchSort!=='default' || c.collection.targetMatchedJobs!==null)) fail('网页未验证支持最新优先或通过数量目标，请使用 collect-app');
+  if(c.collection.source==='android-app' && c.collection.searchSort!=='latest') fail('App 采集需要显式设置 latest 排序');
+  const af=c.collection.appFilters;
+  if(af.experienceInclude.some(v=>!['在校生','应届生','经验不限','1年以内','1-3年','3-5年','5-10年','10年以上'].includes(v))) fail('App 经验选项无效');
+  af.experienceInclude=[...new Set(af.experienceInclude)];
+  if(![null,'today','within3days','thisWeek','thisMonth'].includes(af.bossActivity)) fail('App BOSS 活跃选项无效');
+  if(af.showContactedWithin30Days!==null && typeof af.showContactedWithin30Days!=='boolean') fail('App 沟通过职位开关必须为布尔值或 null');
+  if(c.collection.source==='web' && (af.experienceInclude.length || af.bossActivity!==null || af.showContactedWithin30Days!==null)) fail('App 原生筛选仅适用于 android-app');
+  if(c.collection.targetMatchedJobs!==null && (!Number.isSafeInteger(c.collection.targetMatchedJobs) || c.collection.targetMatchedJobs<1 || c.collection.targetMatchedJobs>c.collection.maxUniqueJobs)) fail('通过目标必须为不超过列表预算的正整数');
   if (c.collection.maxScrollsPerKeyword > 100 || c.collection.detailConcurrency !== 1 || c.collection.detailIntervalMs < 1000) fail('滚动上限为 100，详情并发为 1，间隔至少 1000ms');
   if (c.collection.onAuthenticationOrVerification !== 'pause') fail('登录失效或验证时必须 pause');
   const s = c.preferences.salary;
@@ -72,5 +83,8 @@ export function applyOverrides(input, overrides = {}, options = {}) {
   if (overrides.minSalary !== undefined) c.preferences.salary.minMonthlyK = Number(overrides.minSalary);
   if (overrides.maxSalary !== undefined) c.preferences.salary.maxMonthlyK = Number(overrides.maxSalary);
   if (overrides.limit !== undefined) c.collection.maxUniqueJobs = Number(overrides.limit);
+  if(overrides.source!==undefined)c.collection.source=overrides.source;
+  if(overrides.searchSort!==undefined)c.collection.searchSort=overrides.searchSort;
+  if(overrides.targetMatched!==undefined)c.collection.targetMatchedJobs=Number(overrides.targetMatched);
   return validateConfig(c, options);
 }

@@ -15,6 +15,10 @@ export class Store {
       CREATE TABLE IF NOT EXISTS origins(batch_id TEXT NOT NULL, job_id TEXT NOT NULL, keyword TEXT NOT NULL, PRIMARY KEY(batch_id,job_id,keyword));
       CREATE TABLE IF NOT EXISTS snapshots(id INTEGER PRIMARY KEY, batch_id TEXT NOT NULL, job_id TEXT NOT NULL, kind TEXT NOT NULL, content_hash TEXT NOT NULL, data TEXT NOT NULL, captured_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY, batch_id TEXT NOT NULL, config TEXT NOT NULL, created_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS app_cards(batch_id TEXT NOT NULL REFERENCES batches(id), keyword TEXT NOT NULL, fingerprint TEXT NOT NULL,
+        data TEXT NOT NULL, observed_order INTEGER NOT NULL, preselection TEXT NOT NULL, reason TEXT, result TEXT, job_id TEXT, error TEXT, observed_at TEXT NOT NULL,
+        PRIMARY KEY(batch_id,keyword,fingerprint));
+      CREATE TABLE IF NOT EXISTS app_conditions(batch_id TEXT NOT NULL REFERENCES batches(id),keyword TEXT NOT NULL,data TEXT NOT NULL,verified_at TEXT NOT NULL,PRIMARY KEY(batch_id,keyword));
       PRAGMA user_version=1;`);
   }
   close() { this.db.close(); }
@@ -64,5 +68,27 @@ export class Store {
     const id = randomUUID();
     this.db.prepare('INSERT INTO runs VALUES(?,?,?,?)').run(id, batchId, JSON.stringify(config), new Date().toISOString());
     return id;
+  }
+  appCardCount(id) {return this.db.prepare('SELECT count(DISTINCT fingerprint) AS n FROM app_cards WHERE batch_id=?').get(id).n;}
+  saveAppConditions(id,keyword,data) {
+    this.db.prepare('INSERT INTO app_conditions VALUES(?,?,?,?) ON CONFLICT(batch_id,keyword) DO UPDATE SET data=excluded.data,verified_at=excluded.verified_at')
+      .run(id,keyword,JSON.stringify(data),new Date().toISOString());
+  }
+  appConditions(id) {return this.db.prepare('SELECT * FROM app_conditions WHERE batch_id=? ORDER BY rowid').all(id).map(x=>({keyword:x.keyword,...JSON.parse(x.data),verifiedAt:x.verified_at}));}
+  appCard(id,fingerprint) {
+    const row=this.db.prepare('SELECT job_id AS jobId,result FROM app_cards WHERE batch_id=? AND fingerprint=? ORDER BY job_id IS NOT NULL DESC LIMIT 1').get(id,fingerprint);
+    return row || null;
+  }
+  saveAppCard(id,keyword,input,order,preselection,reason) {
+    const safe=Object.fromEntries(['title','listTitleRaw','company','city','salary','experience','degree','industry','companyScale','summary'].map(k=>[k,typeof input[k]==='string'?input[k].slice(0,10000):null]));
+    this.db.prepare(`INSERT INTO app_cards VALUES(?,?,?,?,?,?,?,NULL,NULL,NULL,?) ON CONFLICT(batch_id,keyword,fingerprint) DO UPDATE SET data=excluded.data,preselection=excluded.preselection,reason=excluded.reason`)
+      .run(id,keyword,input.fingerprint,JSON.stringify(safe),order,preselection,reason,new Date().toISOString());
+  }
+  setAppCardResult(id,keyword,fingerprint,result,jobId=null,error=null) {
+    this.db.prepare('UPDATE app_cards SET result=?,job_id=?,error=? WHERE batch_id=? AND keyword=? AND fingerprint=?').run(result,jobId,error,id,keyword,fingerprint);
+  }
+  appCards(id) {
+    return this.db.prepare('SELECT * FROM app_cards WHERE batch_id=? ORDER BY rowid').all(id).map(x=>({...JSON.parse(x.data),keyword:x.keyword,
+      fingerprint:x.fingerprint,observedOrder:x.observed_order,preselection:x.preselection,reason:x.reason,result:x.result,platformJobId:x.job_id,error:x.error,observedAt:x.observed_at,searchSort:'latest'}));
   }
 }

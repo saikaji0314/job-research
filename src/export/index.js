@@ -22,6 +22,7 @@ export async function exportBatch(store, batchId, config, root) {
   rows.sort((a,b) => Number(b.selection.preferred) - Number(a.selection.preferred));
   const statuses = count(rows.map(x => x.selection.status));
   const details = count(rows.map(x => x.detailStatus));
+  const appCards=store.appCards(batchId);
   const summary = { batchId, runId, exportedAt: new Date().toISOString(), batchStatus: batch.status,
     stopReason: batch.reason, config, configHash: hash(config), jobs: rows.length,
     listObservations: store.db.prepare("SELECT count(*) AS n FROM snapshots WHERE batch_id=? AND kind='list'").get(batchId).n,
@@ -31,9 +32,16 @@ export async function exportBatch(store, batchId, config, root) {
     employment:count(rows.map(x=>x.employmentType || 'unknown')),
     searches: store.db.prepare('SELECT keyword,status,reason FROM searches WHERE batch_id=?').all(batchId),
     note: 'jobs.csv 仅含通过筛选的记录；挑战、待核实、已排除记录分别导出，jobs-all.csv 和 jobs.jsonl 保留全部证据。通过规则不等于能力适配或确认可投。' };
+  if(config.collection.source==='android-app' || appCards.length) {
+    summary.app={searchSort:'latest',verifiedConditions:store.appConditions(batchId),observedCardFingerprints:store.appCardCount(batchId),keywordObservations:appCards.length,
+      preselection:count(appCards.map(x=>x.preselection)),results:count(appCards.map(x=>x.result || 'list_only')),
+      targetMatched:config.collection.targetMatchedJobs ?? null,targetReached:config.collection.targetMatchedJobs==null?null:(statuses.matched || 0)>=config.collection.targetMatchedJobs,
+      note:'列表指纹不是平台岗位 ID；预排除及未取得链接的线索单列审计。最新优先为平台每个搜索词的排序，不保证跨词全局时间排序。'};
+    await writeFile(join(dir,'app-list-observations.jsonl'),appCards.map(x=>JSON.stringify(x)).join('\n')+(appCards.length?'\n':''),'utf8');
+  }
   if (config.exports.includes('jsonl')) await writeFile(join(dir,'jobs.jsonl'), rows.map(x => JSON.stringify(x)).join('\n') + (rows.length ? '\n' : ''), 'utf8');
   if (config.exports.includes('csv')) {
-    const columns = ['platformJobId','title','company','city','salary','salaryPeriod','experience','degree','industry','companyScale','employmentType','employmentLabel','employmentEvidence','selectionWarnings','detailStatus','detailError','detailReason','description','href','collectedAt','keywords','selectionStatus','selectionLabel','selectionReasons','selectionEvidence'];
+    const columns = ['platformJobId','title','company','city','salary','salaryPeriod','experience','degree','industry','companyScale','employmentType','employmentLabel','employmentEvidence','selectionWarnings','detailStatus','detailError','detailReason','description','href','sourceChannel','searchSort','publicationLabelRaw','companyFullName','identityEvidence','collectedAt','keywords','selectionStatus','selectionLabel','selectionReasons','selectionEvidence'];
     const csvRows=rows.map(x=>({...x,salaryPeriod:x.selection.salary.period,employmentLabel:employmentLabels[x.employmentType] || employmentLabels.unknown,
       selectionWarnings:(!x.employmentType || x.employmentType==='unknown')?'用工关系未核实，不能视为企业直招':'',
       detailReason:x.detailStatus==='complete'?'正文已取得且身份核验通过':detailReasons[x.detailError] || `详情状态 ${x.detailStatus}，需进一步核对`,

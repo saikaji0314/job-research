@@ -21,6 +21,9 @@ tmp/
 
 # Dependencies and tooling
 node_modules/
+.venv/
+__pycache__/
+*.pyc
 coverage/
 dist/
 .DS_Store

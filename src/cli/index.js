@@ -8,7 +8,7 @@ import { exportBatch } from '../export/index.js';
 import { collect } from '../collection.js';
 import { acquireLock } from '../browser/lock.js';
 
-const HELP = `Job Research 0.2.0 — 本地岗位采集与筛选（Node.js 24+）
+const HELP = `Job Research 0.3.1 — 本地岗位采集与筛选（Node.js 24+）
 
 用法: node src/cli/index.js <command> [options]
 
@@ -16,6 +16,7 @@ const HELP = `Job Research 0.2.0 — 本地岗位采集与筛选（Node.js 24+�
   validate        检查搜索配置；不启动浏览器
   login           打开独立浏览器，由使用者登录；本机保存会话
   collect         采集列表和完整 JD，可 --phase list|details|all
+  collect-app     已登录安卓 BOSS App 的最新优先采集（可选 Python 后端）
   batches         列出本地批次
   export          --batch <id>，使用保存条件或 --config 重新筛选后导出
   import-fixture  --input <jsonl>，导入明确虚构的离线样例供验证
@@ -27,6 +28,10 @@ const HELP = `Job Research 0.2.0 — 本地岗位采集与筛选（Node.js 24+�
   --min-salary <K>      月薪下限，区间重叠匹配
   --max-salary <K>      月薪上限
   --limit <n>           批次去重上限（1～500）
+  --target-matched <n>  App 严格通过目标，未达到会明确标记；limit 为原始列表预算
+  --python <file>       App Python 解释器，需安装 requirements-android.txt
+  --adb-path <file>     可选 ADB 路径，仅本次运行使用
+  --device <serial>     可选 USB 设备标识，不写入批次配置
   --db <file>           数据库，默认 data/jobs.db
   --output <dir>        导出根目录，默认 output
   --profile-dir <dir>   专用浏览器资料目录，默认 .profiles/boss
@@ -46,15 +51,18 @@ async function main() {
     output:{type:'string',default:'output'}, 'profile-dir':{type:'string',default:'.profiles/boss'}, browser:{type:'string',default:'chrome'},
     timeout:{type:'string',default:'300'}, resume:{type:'string'}, batch:{type:'string'}, phase:{type:'string',default:'all'},
     'retry-failed':{type:'boolean',default:false}, headless:{type:'boolean',default:false}, input:{type:'string'},
+    'target-matched':{type:'string'},python:{type:'string',default:'python'},'adb-path':{type:'string'},device:{type:'string'},
   } });
   if(v.help || !positionals.length) { console.log(HELP); return; }
   const command = positionals[0];
-  if(positionals.length!==1 || !['validate','login','collect','batches','export','import-fixture'].includes(command)) throw new ResearchError('INVALID_COMMAND','未知命令，使用 --help 查看用法');
+  if(positionals.length!==1 || !['validate','login','collect','collect-app','batches','export','import-fixture'].includes(command)) throw new ResearchError('INVALID_COMMAND','未知命令，使用 --help 查看用法');
   const overrides = { city:v.city,keywords:v.keywords,minSalary:v['min-salary'],maxSalary:v['max-salary'],limit:v.limit };
   const changed = Object.values(overrides).some(value=>value!==undefined) || v.config;
+  if(v['target-matched']!==undefined)overrides.targetMatched=v['target-matched'];
+  if(command==='collect-app')Object.assign(overrides,{source:'android-app',searchSort:'latest'});
   let config = await loadConfig(v.config,overrides);
   if(command==='validate') { validateConfig(config,{requireSearch:true}); console.log('配置有效'); return; }
-  if(v.resume && (command!=='collect' || changed)) throw new ResearchError('INVALID_ARGUMENT','--resume 仅用于 collect，且不能同时修改搜索条件；重新筛选请用 export');
+  if(v.resume && (!['collect','collect-app'].includes(command) || changed || v['target-matched']!==undefined)) throw new ResearchError('INVALID_ARGUMENT','--resume 仅用于继续采集，且不能同时修改条件；重新筛选请用 export');
   if(!['all','list','details'].includes(v.phase)) throw new ResearchError('INVALID_PHASE','phase 可选 all、list、details');
   const controller = new AbortController();
   let store, session, release;
@@ -71,7 +79,7 @@ async function main() {
       return;
     }
     if(['batches','export'].includes(command) || v.resume) await access(v.db).catch(()=> { throw new ResearchError('DATABASE_MISSING','数据库不存在，请先采集或导入样例'); });
-    if(command==='collect' && !v.resume) validateConfig(config,{requireSearch:true});
+    if(['collect','collect-app'].includes(command) && !v.resume) validateConfig(config,{requireSearch:true});
     store = new Store(v.db);
     if(command==='batches') { console.log(JSON.stringify(store.batches(),null,2)); return; }
     if(command==='export') {
@@ -92,6 +100,21 @@ async function main() {
       console.log(`虚构样例批次 ${id}\n导出 ${result.dir}`); return;
     }
     if(v.resume) config = validateConfig(store.batch(v.resume).config,{requireSearch:true});
+    if(command==='collect-app') {
+      if(v.phase!=='all' || v.headless || v['retry-failed'])throw new ResearchError('INVALID_ARGUMENT','App 使用完整界面流程，不支持 phase、headless 或 retry-failed');
+      release=await acquireLock('.profiles/android-collector');
+      const {AndroidDriver}=await import('../platforms/boss-app/driver.js');
+      const {collectApp}=await import('../app-collection.js');
+      session=new AndroidDriver({python:v.python,adbPath:v['adb-path'],serial:v.device});
+      let id;
+      try{id=await collectApp({store,driver:session,config,batchId:v.resume,signal:controller.signal,log:console.log});}
+      catch(error){if(error.batchId){const partial=await exportBatch(store,error.batchId,config,v.output);console.log(`阶段性结果 ${partial.dir}`);}throw error;}
+      const result=await exportBatch(store,id,config,v.output);
+      console.log(`App 采集结束：${result.summary.batchStatus}；严格通过 ${result.summary.selection.matched || 0}；${result.dir}`);
+      if(result.summary.app?.targetReached===false)console.log('提示：尚未达到严格通过目标，不能将原始线索或挑战岗位当作完成数量。');
+      return;
+    }
+    if(command==='collect' && config.collection.source!=='web')throw new ResearchError('INVALID_CONFIG','App 批次需要使用 collect-app，不能用网页恢复');
     if(v.phase==='details' && !v.resume) throw new ResearchError('BATCH_REQUIRED','详情阶段需要 --resume 指定已有批次');
     release = await acquireLock(v['profile-dir']);
     const { openSession } = await import('../browser/session.js');

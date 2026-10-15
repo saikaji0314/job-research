@@ -4,6 +4,14 @@
   "regionName": null,
   "keywords": [],
   "collection": {
+    "source": "web",
+    "searchSort": "default",
+    "targetMatchedJobs": null,
+    "appFilters": {
+      "experienceInclude": [],
+      "bossActivity": null,
+      "showContactedWithin30Days": null
+    },
     "maxUniqueJobs": 30,
     "maxScrollsPerKeyword": 2,
     "detailConcurrency": 1,

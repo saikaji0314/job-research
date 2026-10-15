@@ -1,0 +1,2 @@
+# Optional Android UI backend; Node-only web collection does not require Python.
+uiautomator2==3.7.0

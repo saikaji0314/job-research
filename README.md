@@ -4,9 +4,11 @@
 
 ## 当前状态
 
-0.2.0 CLI 已实现：用户登录、多关键词列表采集、完整 JD 读取、身份校验、SQLite 批次与快照、中断继续、资格与条件筛选，以及 JSONL／CSV 分组导出。32 项测试通过；首轮真实采集 30 条去重岗位，26 条取得正文，并完成 5 条页面抽查。
+0.3.1 增加可选安卓 BOSS App 后端，通过真实搜索界面的“最新优先”发现岗位；网页后端保持默认排序。支持登录后的多词采集、正文与身份核验、SQLite、恢复、资格筛选及 CSV 分组导出。网页首轮真实采集 30 条，26 条取得正文；App 已做少量真实取证，批量验证范围见 [验证记录](docs/validation.md)。
 
 仅支持 BOSS，平台页面或接口变化可能影响适配。完整 JD 来自带岗位 ID 的接口响应，或经 URL、canonical 链接、标题和公司一致性核对的页面正文；无法核对时保留失败状态，列表标签不冒充正文。测试边界见 [验证记录](docs/validation.md)。
+
+App 后端通过 USB 与使用者的安卓手机交互，读取界面正文及本地复制的岗位链接，不使用未核实的搜索接口参数。网页未验证支持“最新优先”，不得将默认排序结果视作最新。App 使用和边界见 [安卓采集](docs/android-app.md)。
 
 ## 首版目标
 
@@ -71,6 +73,8 @@ node src/cli/index.js export --batch "批次ID" --min-salary 20
 | --- | --- |
 | `regionName`、`keywords` | 平台搜索城市和关键词，多关键词分别执行 |
 | `collection.maxUniqueJobs` | 批次去重上限 1～500；不是保证可取得数量 |
+| `collection.source`、`searchSort` | 网页为 web/default；App 为 android-app/latest；不支持网页 latest |
+| `collection.targetMatchedJobs` | 可选 App 严格通过目标；null 不设目标；不把挑战、待核实或原始线索计入目标 |
 | `preferences.titleInclude` | 标题包含任一词即满足，空数组不限制 |
 | `preferences.salary` | 月薪上下限，单位 K，区间有交集即满足；未知薪资待核实 |
 | `salary.periodInclude` | 允许的薪资周期：month、day、hour、year；例如仅接受月薪时填 month，不将日薪自动换算月薪 |
@@ -101,6 +105,8 @@ node src/cli/index.js export --batch "批次ID" --min-salary 20
 | `summary.json` | 生效条件、各组计数和文件对应关系 |
 
 CSV 同时提供英文状态码与中文状态、可读筛选原因、详情缺失原因及证据。优先查看 jobs.csv 和 jobs-challenge.csv；审计全集中的 rejected 不是推荐结果。
+
+App 的列表卡片没有可直接读取的岗位 ID，明确冲突可先排除并记录在 `app-list-observations.jsonl`，其指纹仅代表观察线索。取得正文和官方分享链接后才进入正式岗位表；摘要分别统计原始线索、已核验岗位和严格通过目标。`publicationLabelRaw` 仅保存平台可见原文，不恢复已撤回的发布日期条件。
 
 ## 测试与离线演示
 
