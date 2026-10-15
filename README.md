@@ -4,9 +4,7 @@
 
 ## 当前状态
 
-0.3.0 CLI 已实现：用户登录、多关键词列表采集、完整 JD 读取、身份校验、SQLite 批次与快照、中断继续、资格与发布时间筛选，以及 JSONL／CSV 分组导出。43 项测试通过；首轮真实采集 30 条去重岗位，26 条取得正文，并完成 5 条页面抽查。
-
-可设置最近 30 天发布，但必须有明确发布日期证据。2026-10-15 真实复查中，BOSS 页面只提供“页面更新时间”，列表接口也未提供可靠发布日期；这类记录会进入待核实，不能据此产出可信的近期新挂清单。具体口径见 [发布时间筛选](docs/publication-dates.md)。
+0.2.0 CLI 已实现：用户登录、多关键词列表采集、完整 JD 读取、身份校验、SQLite 批次与快照、中断继续、资格与条件筛选，以及 JSONL／CSV 分组导出。32 项测试通过；首轮真实采集 30 条去重岗位，26 条取得正文，并完成 5 条页面抽查。
 
 仅支持 BOSS，平台页面或接口变化可能影响适配。完整 JD 来自带岗位 ID 的接口响应，或经 URL、canonical 链接、标题和公司一致性核对的页面正文；无法核对时保留失败状态，列表标签不冒充正文。测试边界见 [验证记录](docs/validation.md)。
 
@@ -55,11 +53,9 @@ node src/cli/index.js batches
 node src/cli/index.js collect --resume "批次ID" --phase details
 node src/cli/index.js collect --resume "批次ID" --phase details --retry-failed
 node src/cli/index.js export --batch "批次ID" --min-salary 20
-node src/cli/index.js export --batch "批次ID" --published-within-days 30
-node src/cli/index.js collect --resume "批次ID" --phase details --refresh-details
 ```
 
-继续批次使用原搜索计划，默认不重复访问成功正文；`--retry-failed` 重试未成功记录，`--refresh-details` 则重读全部详情并保留历史快照，可用于补充旧批次日期字段。刷新也可能失败或遇到平台验证，历史正文不代表当前仍可投。
+继续批次使用原搜索计划，已成功取得的正文不重复访问；`--retry-failed` 才会重试缺正文、失败或身份不符的记录。若需要更新已成功岗位的当前状态，应创建新采集批次，历史正文不代表当前仍可投。
 
 重新导出不会访问招聘平台。不指定配置文件时沿用批次条件，命令行参数覆盖指定项；提供 `--config` 则以该文件的一整套配置为基础。每次导出独立保存条件和运行 ID，不覆盖旧结果。
 
@@ -76,7 +72,6 @@ node src/cli/index.js collect --resume "批次ID" --phase details --refresh-deta
 | `regionName`、`keywords` | 平台搜索城市和关键词，多关键词分别执行 |
 | `collection.maxUniqueJobs` | 批次去重上限 1～500；不是保证可取得数量 |
 | `preferences.titleInclude` | 标题包含任一词即满足，空数组不限制 |
-| `preferences.publishedWithinDays` | 最近 n 个自然日发布，含今天，按北京时间；null 不限制，1～3650；日期未知、冲突或未来时间待核实 |
 | `preferences.salary` | 月薪上下限，单位 K，区间有交集即满足；未知薪资待核实 |
 | `salary.periodInclude` | 允许的薪资周期：month、day、hour、year；例如仅接受月薪时填 month，不将日薪自动换算月薪 |
 | `candidate.educationLevel` | 可选候选学历；按岗位最低学历与候选学历比较，例如候选本科不能通过硕士硬要求 |
@@ -106,8 +101,6 @@ node src/cli/index.js collect --resume "批次ID" --phase details --refresh-deta
 | `summary.json` | 生效条件、各组计数和文件对应关系 |
 
 CSV 同时提供英文状态码与中文状态、可读筛选原因、详情缺失原因及证据。优先查看 jobs.csv 和 jobs-challenge.csv；审计全集中的 rejected 不是推荐结果。
-
-日期列分别保留 `publishedAt`（岗位发布）、`jobUpdatedAt`（岗位更新）、`pageUpdatedAt`（页面更新）、`firstSeenAt`（本数据库首次发现）和 `collectedAt`（采集）。发布日期另有来源、原文与有效状态；摘要保存筛选时刻、日期窗口和缺失警告。其他时间不能替代发布日期。
 
 ## 测试与离线演示
 

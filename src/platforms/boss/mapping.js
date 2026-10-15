@@ -3,7 +3,6 @@
 import { ResearchError } from '../../domain/errors.js';
 import { sanitizeJob } from '../../domain/job.js';
 import { classifyEmployment } from '../../domain/employment.js';
-import {apiDateEvidence,pageDateEvidence} from './dates.js';
 
 export const decodeBossText = (value = '') => String(value).replace(/[\uE031-\uE03A]/g, c => String(c.codePointAt(0)-0xE031));
 const strings = value => Array.isArray(value) ? value.map(x => typeof x === 'string' ? x : x?.name || x?.text).filter(x => typeof x === 'string') : [];
@@ -11,9 +10,9 @@ export function mapListJob(item) {
   return sanitizeJob({ platform: 'boss', platformJobId: item.encryptJobId, title: item.jobName, company: item.brandName,
     city: [item.cityName,item.areaDistrict,item.businessDistrict].filter(Boolean).join('·'), salary: decodeBossText(item.salaryDesc || ''),
     experience: item.jobExperience, degree: item.jobDegree, industry: item.brandIndustry, companyScale: item.brandScaleName,
-    companyStage: item.brandStageName, summary: [...strings(item.skills),...strings(item.jobLabels)].join(' '), detailStatus: 'pending',dateEvidence:apiDateEvidence(item,'jobList') });
+    companyStage: item.brandStageName, summary: [...strings(item.skills),...strings(item.jobLabels)].join(' '), detailStatus: 'pending' });
 }
-export function mapDetail(payload, expected, extraDates=[]) {
+export function mapDetail(payload, expected) {
   if (payload?.code !== 0) throw new ResearchError('DETAIL_RESPONSE_REJECTED', '详情接口未返回成功状态');
   const info = payload.zpData?.jobInfo;
   if (!info) throw new ResearchError('DETAIL_MISSING', '详情接口缺少岗位信息');
@@ -28,8 +27,7 @@ export function mapDetail(payload, expected, extraDates=[]) {
     industry: brand.industryName || expected.industry, companyScale: brand.scaleName || expected.companyScale,
     companyStage: brand.stageName || expected.companyStage, companyAddress: info.address,
     recruitmentStatus: info.jobStatusDesc, description: expired ? '' : description,
-    detailStatus: expired ? 'expired' : description ? 'complete' : 'missing', detailSource: 'network-response',detailError:null,
-    dateEvidence:[...(expected.dateEvidence || []),...apiDateEvidence(info,'jobInfo'),...extraDates],
+    detailStatus: expired ? 'expired' : description ? 'complete' : 'missing', detailSource: 'network-response',
     ...classifyEmployment(`${info.jobName || ''}\n${description}`) });
 }
 
@@ -47,8 +45,7 @@ export function mapDomDetail(snapshot, expected) {
   const expired=/已关闭|已下线|停止招聘|已结束/.test(snapshot.statusText || '');
   const description=typeof snapshot.description==='string'?snapshot.description.trim():'';
   return sanitizeJob({...expected,description:expired?'':description,
-    detailStatus:expired?'expired':description?'complete':'missing',detailSource:'verified-dom',detailError:null,
-    dateEvidence:[...(expected.dateEvidence || []),...pageDateEvidence(snapshot,expected)],
+    detailStatus:expired?'expired':description?'complete':'missing',detailSource:'verified-dom',
     recruitmentStatus:snapshot.statusText || expected.recruitmentStatus,
     ...classifyEmployment(`${snapshot.title}\n${description}`)});
 }

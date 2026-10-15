@@ -47,8 +47,7 @@ export class Store {
       const old = this.db.prepare('SELECT data FROM jobs WHERE batch_id=? AND platform=? AND job_id=?').get(batchId, job.platform, job.platformJobId);
       const previous = old ? JSON.parse(old.data) : null;
       // Revisiting a list must never erase an already captured detail.
-      const merged = kind === 'list' && previous ? sanitizeJob({ ...previous, ...Object.fromEntries(Object.entries(job).filter(([k,v]) => v !== null && v !== '' && !['description','detailStatus','detailSource','employmentType','employmentEvidence'].includes(k))),
-        dateEvidence:[...(previous.dateEvidence || []),...job.dateEvidence] }) : job;
+      const merged = kind === 'list' && previous ? { ...previous, ...Object.fromEntries(Object.entries(job).filter(([k,v]) => v !== null && v !== '' && !['description','detailStatus','detailSource','employmentType','employmentEvidence'].includes(k))) } : job;
       this.db.prepare(`INSERT INTO jobs(batch_id,platform,job_id,data,collected_at,detail_attempts) VALUES(?,?,?,?,?,?)
         ON CONFLICT(batch_id,platform,job_id) DO UPDATE SET data=excluded.data,collected_at=excluded.collected_at,detail_attempts=jobs.detail_attempts+excluded.detail_attempts`)
         .run(batchId, job.platform, job.platformJobId, JSON.stringify(merged), now, attempted ? 1 : 0);
@@ -59,7 +58,6 @@ export class Store {
   jobs(id) {
     return this.db.prepare('SELECT * FROM jobs WHERE batch_id=? ORDER BY rowid').all(id).map(row => ({ ...JSON.parse(row.data),
       collectedAt: row.collected_at, detailAttempts: row.detail_attempts,
-      firstSeenAt:this.db.prepare('SELECT min(captured_at) AS first_seen FROM snapshots WHERE job_id=?').get(row.job_id).first_seen,
       keywords: this.db.prepare('SELECT keyword FROM origins WHERE batch_id=? AND job_id=? ORDER BY keyword').all(id, row.job_id).map(x => x.keyword) }));
   }
   saveRun(batchId, config) {

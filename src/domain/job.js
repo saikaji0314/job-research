@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import {temporalFields} from './dates.js';
 
 export const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const fields = ['platformJobId', 'title', 'company', 'city', 'salary', 'experience', 'degree', 'industry', 'companyScale',
@@ -17,5 +16,5 @@ export function sanitizeJob(input) {
     if (!['network-response', 'verified-dom', 'fixture'].includes(input.detailSource)) throw new Error('完整正文需要明确来源');
   } else { out.description = ''; out.detailStatus = input.detailStatus === 'complete' ? 'missing' : input.detailStatus || 'pending'; }
   if (!['pending', 'complete', 'missing', 'failed', 'identity_mismatch', 'expired'].includes(out.detailStatus)) throw new Error('无效详情状态');
-  return {...out,...temporalFields(input)};
+  return out;
 }

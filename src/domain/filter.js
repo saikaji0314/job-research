@@ -1,5 +1,4 @@
 import {checkEducation,checkExperience,internshipEvidence} from './qualification.js';
-import {checkPublishedWithin} from './dates.js';
 export function parseSalary(raw = '') {
   const text = String(raw).normalize('NFKC').replace(/\s/g, '');
   const months = text.match(/[·•.](\d{2})薪/);
@@ -15,14 +14,10 @@ export function parseSalary(raw = '') {
   return result;
 }
 const normalized = v => String(v ?? '').normalize('NFKC').replace(/\s/g, '').replace(/[～~—]/g, '-').toLowerCase();
-export function filterJob(job, preferences, {now=new Date()} = {}) {
+export function filterJob(job, preferences) {
   const checks = [];
   const add = (field, result, evidence, reason) => checks.push({ field, result, evidence, reason:reason || `${field}: ${result}` });
   const salary = parseSalary(job.salary);
-  if(preferences.publishedWithinDays!=null) {
-    const check=checkPublishedWithin(job,preferences.publishedWithinDays,now);
-    add('publishedWithinDays',check.result,{publishedAt:job.publishedAt || null,source:job.publishedAtSource || null},check.reason);
-  }
   if(preferences.requireCompleteDetails) add('detail',job.detailStatus==='complete' && job.description?.trim()?'matched':'unknown',job.detailError || job.detailStatus || null,
     job.detailStatus==='complete' && job.description?.trim()?'已取得通过身份核验的岗位正文':'未取得通过身份核验的完整正文，需要补读');
   if(preferences.excludeInternships) {
