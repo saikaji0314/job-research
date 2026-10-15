@@ -62,6 +62,11 @@ def verify_identity(card, title, company, full_company=None):
     raise UiError('IDENTITY_MISMATCH')
 
 
+def is_client_company_display(card, publisher, company_label):
+    match = re.fullmatch(r'客户公司\s*[:：]\s*(.+)',company_label or '')
+    return bool(match and norm(match.group(1))==norm(card['company']) and norm(publisher)!=norm(card['company']))
+
+
 def card_key(card):
     fields = ['title', 'company', 'city', 'salary', 'experience', 'degree']
     return hashlib.sha256(json.dumps([norm(card.get(k)) for k in fields], ensure_ascii=False).encode()).hexdigest()
@@ -438,6 +443,9 @@ class AppUi:
         root = self.wait(detail_ready,timeout=18)
         title = text_of(root, 'tv_job_name')
         company_short = re.split(r'[•·]', text_of(root, 'tv_boss_title'))[0].strip()
+        if is_client_company_display(card,company_short,text_of(root,'tv_com_name')):
+            # Publisher and client are different roles; don't assert a full company identity for this lead.
+            raise UiError('DETAIL_COMPANY_UNAVAILABLE')
         try:
             comparison = verify_identity(card,title,company_short)
         except UiError as error:

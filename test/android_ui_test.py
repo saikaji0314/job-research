@@ -9,6 +9,11 @@ spec.loader.exec_module(ui)
 
 
 class AndroidUiTests(unittest.TestCase):
+    def test_client_company_label_does_not_turn_publisher_into_the_employer(self):
+        card={'company':'某示例人工智能公司'}
+        self.assertTrue(ui.is_client_company_display(card,'虚构招聘服务商','客户公司 : 某示例人工智能公司'))
+        self.assertFalse(ui.is_client_company_display(card,'虚构招聘服务商','客户公司 : 其他公司'))
+        self.assertFalse(ui.is_client_company_display(card,card['company'],'客户公司 : 某示例人工智能公司'))
     def test_different_truncated_company_labels_remain_unverified(self):
         card={'title':'虚构工程师','company':'虚构示例企业...'}
         with self.assertRaisesRegex(ui.UiError,'DETAIL_COMPANY_UNAVAILABLE'):
