@@ -72,7 +72,7 @@ node src/cli/index.js export --batch "批次ID" --min-salary 20
 | 配置 | 语义 |
 | --- | --- |
 | `regionName`、`keywords` | 平台搜索城市和关键词，多关键词分别执行 |
-| `collection.maxUniqueJobs` | 批次去重上限 1～500；不是保证可取得数量 |
+| `collection.maxUniqueJobs` | 预算 1～500；网页按岗位 ID，App 按列表线索指纹计算；不是保证可取得的正式岗位数量 |
 | `collection.source`、`searchSort` | 网页为 web/default；App 为 android-app/latest；不支持网页 latest |
 | `collection.targetMatchedJobs` | 可选 App 严格通过目标；null 不设目标；不把挑战、待核实或原始线索计入目标 |
 | `collection.appFilters` | App 经验多选、BOSS 活跃范围与沟通过职位开关，应用后重新打开核验；枚举见 [安卓采集](docs/android-app.md) |
